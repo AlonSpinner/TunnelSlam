@@ -1,2 +1,6 @@
 
 symforce/
+
+*.pyc
+
+refs/robot_2d_triangulation/

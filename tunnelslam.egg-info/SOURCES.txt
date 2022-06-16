@@ -1,0 +1,6 @@
+README.md
+setup.py
+tunnelslam.egg-info/PKG-INFO
+tunnelslam.egg-info/SOURCES.txt
+tunnelslam.egg-info/dependency_links.txt
+tunnelslam.egg-info/top_level.txt
