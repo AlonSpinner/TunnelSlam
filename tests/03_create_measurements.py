@@ -44,9 +44,10 @@ for k in range(0,K-1):
         for index,lm in enumerate(landmarks):
                 rel_lm = np.asarray(x.inverse() * geo.Vector3(lm),dtype = "float")
                 r = np.linalg.norm(rel_lm)
-                theta = np.arctan2(rel_lm[0],rel_lm[1]) #yaw
-                psi = np.arctan2(np.linalg.norm(rel_lm[:2]),rel_lm[2]) #pitch
-                if 0 <= theta <= np.pi and r < 4.0:
+                theta = np.arctan2(rel_lm[1],rel_lm[0]) #yaw
+                psi = np.arctan2(rel_lm[2],np.linalg.norm(rel_lm[:2])) #pitch
+
+                if -np.pi/2 <= theta <= np.pi/2 and r < 5.0:
                         z = np.random.multivariate_normal(np.array([r,theta,psi]),meas_cov)
                         zk_values.append(z)
                         zk_indexes.append(index)
