@@ -50,13 +50,15 @@ for k in range(K):
                 r = np.linalg.norm(rel_lm)
                 theta = np.arctan2(rel_lm[0],rel_lm[1]) #yaw
                 psi = np.arctan2(np.linalg.norm(rel_lm[:2]),rel_lm[2]) #pitch
-                if 0 <= theta <= np.pi and r < 2.0:
+                if 0 <= theta <= np.pi and r < 4.0:
                         z = np.random.multivariate_normal(np.array([r,theta,psi]),meas_cov)
                         zk_values.append(z)
                         zk_indexes.append(index)
         meas_lm_hist[k] = ({"values": zk_values, "indexes": zk_indexes})
         gt_hist[k] = x
 
+
+#plot 
 fig = plt.figure()
 ax = plt.axes(projection='3d',
         xlim = (-15,10), ylim = (-5,5), zlim = (-5,5),
@@ -64,14 +66,27 @@ ax = plt.axes(projection='3d',
 ax.set_box_aspect(aspect = (1,1,1))
 ax.scatter3D(landmarks[:,0], landmarks[:,1], landmarks[:,2])
 for x in gt_hist:
-        plotPose3(ax,x)
-
+        gt_graphics = plotPose3(ax,x)
 x = gt_hist[0]
 for o in meas_odom_hist:
-        plotPose3(ax,x,'gray')
+        dr_graphics = plotPose3(ax,x,'gray')
         x = x.compose(o)
-
+ax.legend([gt_graphics,dr_graphics],['ground truth','dead reckoning'])
 plt.show()
+
+
+#save measurements
+dir_path = os.path.dirname(os.path.realpath(__file__))
+
+filename = os.path.join(dir_path,'out','meas_lm_hist.pickle')
+file = open(filename, 'wb')
+pickle.dump(meas_lm_hist,file)
+file.close()
+
+filename = os.path.join(dir_path,'out','meas_odom_hist.pickle')
+file = open(filename, 'wb')
+pickle.dump(meas_odom_hist,file)
+file.close()
 
 
 
