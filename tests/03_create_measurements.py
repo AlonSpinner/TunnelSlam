@@ -22,14 +22,14 @@ file.close()
 
 odom = geo.Pose3_SE3(R=geo.Rot3.identity(), t= geo.Vector3(np.array([-2,0,0])))
 x = geo.Pose3_SE3(R=geo.Rot3.identity(), t=geo.Vector3(np.array([5,0,0])))
-odom_cov = 0.1*np.eye(1)
-meas_cov = np.diag([0.1,np.radians(1),np.radians(1)])
+odom_cov = 0.1*np.eye(1) * 0
+meas_cov = np.diag([0.1,np.radians(1),np.radians(1)]) * 0
 
 K = 5
-gt_hist = [[] for k in range(K)]
-meas_odom_hist = [[] for k in range(K)]
-meas_lm_hist = [[] for k in range(K)]
-for k in range(K):
+gt_hist = [[] for k in range(K)]; gt_hist[0] = x
+meas_odom_hist = [[] for k in range(K-1)]
+meas_lm_hist = [[] for k in range(K-1)]
+for k in range(0,K-1):
         #move
         x = x.compose(odom)
         
@@ -38,6 +38,7 @@ for k in range(K):
         meas_odom_hist[k] = (odom.retract(tangent_perturbation, epsilon = epsilon))
 
         zk_values = []
+        zk_projections = []
         zk_indexes = []
         #measure landmarks
         for index,lm in enumerate(landmarks):
@@ -49,8 +50,16 @@ for k in range(K):
                         z = np.random.multivariate_normal(np.array([r,theta,psi]),meas_cov)
                         zk_values.append(z)
                         zk_indexes.append(index)
-        meas_lm_hist[k] = ({"values": zk_values, "indexes": zk_indexes})
-        gt_hist[k] = x
+
+                        #https://en.wikipedia.org/wiki/Spherical_coordinate_system
+                        rel_lm_x = z[0] * np.sin(z[2]) * np.cos(z[1])
+                        rel_lm_y = z[0] * np.sin(z[2]) * np.sin(z[1])
+                        rel_lm_z = z[0] * np.cos(z[2])
+                        # zk_projections.append(np.array([rel_lm_x,rel_lm_y,rel_lm_z]))
+                        zk_projections.append(rel_lm)
+
+        meas_lm_hist[k] = ({"values": zk_values, "projections": zk_projections, "indexes": zk_indexes})
+        gt_hist[k+1] = x
 
 
 #plot 
@@ -60,12 +69,21 @@ ax = plt.axes(projection='3d',
         xlabel = 'x', ylabel = 'y', zlabel = 'z')
 ax.set_box_aspect(aspect = (1,1,1))
 ax.scatter3D(landmarks[:,0], landmarks[:,1], landmarks[:,2])
+#ground truth
 for x in gt_hist:
         gt_graphics = plotPose3(ax,x)
-x = gt_hist[0]
-for o in meas_odom_hist:
-        dr_graphics = plotPose3(ax,x,'gray')
-        x = x.compose(o)
+
+dr_x = gt_hist[0]
+#dead reckoning + projections
+for k, o in enumerate(meas_odom_hist):
+        dr_graphics = plotPose3(ax,dr_x,'gray')
+
+        dr_x = dr_x.compose(o)
+
+        for rel_lm in np.array(meas_lm_hist[k]["projections"]):
+                lm = np.asarray(dr_x * geo.Vector3(rel_lm),dtype = "float")
+                ax.scatter3D(lm[0],lm[1],lm[2], c = 'r', s = 50, facecolors = 'none')
+
 ax.legend([gt_graphics,dr_graphics],['ground truth','dead reckoning'])
 plt.show()
 

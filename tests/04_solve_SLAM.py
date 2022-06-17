@@ -36,12 +36,19 @@ meas_odom_hist = [geo.Pose3_SE3.from_storage(o) for o in meas_odom_hist]
 file.close()
 
 # -----------------------------------------------------------------------------
+# dead reckoning
+# -----------------------------------------------------------------------------
+
+
+# -----------------------------------------------------------------------------
 # Build Values
 # -----------------------------------------------------------------------------
 num_poses = len(meas_odom_hist) + 1
 values = Values()
 
 values["x"] = [geo.Pose3_SE3.identity() for _ in range(num_poses)] #temporary
+
+[_['indexes'] for _ in meas_lm_hist]
 #values["l"] = 
 values["odom_cov"] = 0.1*np.eye(1)
 values["meas_cov"] = np.diag([0.1,np.radians(1),np.radians(1)])
