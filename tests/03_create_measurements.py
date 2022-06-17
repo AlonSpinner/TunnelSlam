@@ -2,7 +2,6 @@ import symforce
 symforce.set_backend("sympy")
 symforce.set_log_level("warning")
 from symforce import geo
-import sympy 
 import numpy as np
 import matplotlib.pyplot as plt
 from tunnelslam.plotting import plotPose3
@@ -24,11 +23,7 @@ file.close()
 odom = geo.Pose3_SE3(R=geo.Rot3.identity(), t= geo.Vector3(np.array([-2,0,0])))
 x = geo.Pose3_SE3(R=geo.Rot3.identity(), t=geo.Vector3(np.array([5,0,0])))
 odom_cov = 0.1*np.eye(1)
-meas_cov = np.eye(3)
-meas_cov[0,0] = 0.1
-meas_cov[1,1] = np.radians(1)
-meas_cov[2,2] = np.radians(1)
-
+meas_cov = np.diag([0.1,np.radians(1),np.radians(1)])
 
 K = 5
 gt_hist = [[] for k in range(K)]
@@ -74,7 +69,6 @@ for o in meas_odom_hist:
 ax.legend([gt_graphics,dr_graphics],['ground truth','dead reckoning'])
 plt.show()
 
-
 #save measurements
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -83,9 +77,10 @@ file = open(filename, 'wb')
 pickle.dump(meas_lm_hist,file)
 file.close()
 
+
 filename = os.path.join(dir_path,'out','meas_odom_hist.pickle')
 file = open(filename, 'wb')
-pickle.dump(meas_odom_hist,file)
+pickle.dump([o.to_storage() for o in meas_odom_hist],file)
 file.close()
 
 
