@@ -3,8 +3,10 @@ from symforce import typing as T
 from symforce import sympy as sm
 
 
-def radial(
-    x: geo.Pose3, lm: geo.V3, r : T.Scalar
+def radial_residual(
+    x: geo.Pose3, 
+    lm: geo.V3, 
+    r : T.Scalar
 ) -> T.Scalar:
     """
     Residual from a relative translation mesurement of a 3D pose to a landmark.
@@ -18,7 +20,10 @@ def radial(
     return e**2
 
 def measurement_residual(
-    x: geo.Pose3, lm: geo.V3, z: geo.V3, info: geo.Matrix33
+    x: geo.Pose3,
+    lm: geo.V3, 
+    z: geo.V3, 
+    sqsrtInfo: geo.Matrix33
 ) -> T.Scalar:
     """
     Residual from a relative translation mesurement of a 3D pose to a landmark.
@@ -35,14 +40,14 @@ def measurement_residual(
     psi = sm.atan2(rel_lm[2],geo.V2(rel_lm[:2]).norm()) #pitch
     h = geo.V3([r,theta,psi])
     e = z-h
-    return e.T * info * e
+    return sqsrtInfo * e
 
 
 def odometry_residual(
     x1: geo.Pose3_SE3,
     x2: geo.Pose3_SE3,
     odom: geo.Pose3_SE3,
-    diagonal_sigmas: geo.V6,
+    sqrtInfo: geo.V6,
     epsilon: T.Scalar,
 ) -> geo.V6:
     """
@@ -52,9 +57,9 @@ def odometry_residual(
         world_T_a: First pose in the world frame
         world_T_b: Second pose in the world frame
         a_T_b: Relative pose measurement between the poses
-        diagonal_sigmas: Diagonal standard deviation of the tangent-space error
+        sqrtInfo: Sqrt information matrix
         epsilon: Small number for singularity handling
     """
     predict = x1.inverse() * x2
     tangent_error = predict.local_coordinates(odom, epsilon = epsilon)
-    return T.cast(geo.V6, geo.M.diag(diagonal_sigmas.to_flat_list()).inv() * geo.V6(tangent_error))
+    return geo.V6, sqrtInfo * geo.V6(tangent_error)
