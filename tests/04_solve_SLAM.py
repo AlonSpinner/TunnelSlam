@@ -27,6 +27,8 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 filename = os.path.join(dir_path,'out','meas_lm_hist.pickle')
 file = open(filename, 'rb')
 meas_lm_hist = pickle.load(file)
+for meas in meas_lm_hist:
+        meas["projections"] = [geo.V3(proj) for proj in meas["projections"]]
 file.close()
 
 #load odom measurements
@@ -58,11 +60,10 @@ for i, zi in enumerate(meas_lm_hist):
         measurements_indices.extend(zi["indices"])
         measurements_projections.extend(zi["projections"])
 measurements_indices = np.asarray(measurements_indices)
-measurements_projections = np.asarray(measurements_projections)
 
 values["l"] = [geo.V3() for _ in range(max(measurements_indices[:,1])+1)]
 for id,proj in zip(measurements_indices,measurements_projections):
-        values["l"][id[1]] = x_initial[id[0]] * geo.V3(proj) #plant a dead reckoning projection in list
+        values["l"][id[1]] = x_initial[id[0]] * proj #plant a dead reckoning projection in list
 
 values["odom_sqrtInfo"] = geo.Matrix(cov2sqrtInfo(0.1*np.eye(1)))
 values["meas_sqrtInfo"] = geo.Matrix(cov2sqrtInfo(np.diag([0.1,np.radians(1),np.radians(1)])))
@@ -101,13 +102,13 @@ for k in range(len(meas_odom_hist)):
 # -----------------------------------------------------------------------------
 # optimize
 # -----------------------------------------------------------------------------
-optimized_keys_x = [f"x{k}" for k in range(len(meas_odom_hist)+1)]
+optimized_keys_x = [f"x[{k}]" for k in range(len(meas_odom_hist)+1)]
 #landmarks are a little annoying. find all indicies of lms measured, and then run on the unique set
 measurements_indices = []
 for i, zi in enumerate(values["z"]):
         measurements_indices.extend(zi["indices"])
 measurements_indices = np.asarray(measurements_indices)
-optimized_keys_lm = [f"lm{k}" for k in np.unique(measurements_indices[:,1])]
+optimized_keys_lm = [f"l[{k}]" for k in np.unique(measurements_indices[:,1])]
 optimized_keys = optimized_keys_x + optimized_keys_lm
 
 
