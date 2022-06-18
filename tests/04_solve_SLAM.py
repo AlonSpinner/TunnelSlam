@@ -20,7 +20,7 @@ from symforce.opt.factor import Factor
 np.random.seed(1)
 
 # -----------------------------------------------------------------------------
-# Load measurements
+# Load data
 # -----------------------------------------------------------------------------
 #load lm measurements 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -52,12 +52,17 @@ for k,o in enumerate(meas_odom_hist):
 values["x"] = x_initial
 
 #initial gusses for landmarks from dead reckoning
-# for k, meas_lm_k in enumerate(meas_lm_hist):
-#         x_initial[k] * meas_lm_hist
-# for meas_k in meas_lm_hist:
-#         combined.extend(meas_k["indexes"])
-# [np.asarray(_['indexes'],dtype='int') for _ in meas_lm_hist]
-#values["l"] = 
+measurements_indices = [] #just collect these two terms nicely
+measurements_projections = []
+for i, zi in enumerate(meas_lm_hist):
+        measurements_indices.extend(zi["indices"])
+        measurements_projections.extend(zi["projections"])
+measurements_indices = np.asarray(measurements_indices)
+measurements_projections = np.asarray(measurements_projections)
+
+values["l"] = [geo.V3() for _ in range(max(measurements_indices[:,1])+1)]
+for id,proj in zip(measurements_indices,measurements_projections):
+        values["l"][id[1]] = x_initial[id[0]] * geo.V3(proj) #plant a dead reckoning projection in list
 
 values["odom_sqrtInfo"] = geo.Matrix(cov2sqrtInfo(0.1*np.eye(1)))
 values["meas_sqrtInfo"] = geo.Matrix(cov2sqrtInfo(np.diag([0.1,np.radians(1),np.radians(1)])))
@@ -70,14 +75,13 @@ values["z"] = meas_lm_hist
 # -----------------------------------------------------------------------------
 factors = []
 # measurements
-for i, meas_lm_i in enumerate(meas_lm_hist):
-        for j in range(len(meas_lm_hist[i])):
-                indexes = meas_lm_hist[i]["indexes"][j]
+for i, zi in enumerate(values["z"]):
+        for j in range(len(zi)):
                 factors.append(
                         Factor(residual = measurement_residual,
                         keys = [
-                                f"x[z[{i}]['indexes'][{j}][0]]",
-                                f"l[z[{i}]['indexes'][{j}][1]]",
+                                f"x[z[{i}]['indices'][{j}][0]]",
+                                f"l[z[{i}]['indices'][{j}][1]]",
                                 f"z[{i}]['values'][{j}]",
                                 "meas_sqrtInfo",
                         ]))
@@ -97,12 +101,22 @@ for k in range(len(meas_odom_hist)):
 # -----------------------------------------------------------------------------
 # optimize
 # -----------------------------------------------------------------------------
-# optimizer = Optimizer(
-# factors=factors,
-# optimized_keys=optimized_keys,
-# # Return problem stats for every iteration
-# debug_stats=True,
-# # Customize optimizer behavior
-# params=Optimizer.Params(verbose=True, initial_lambda=1e4, lambda_down_factor=1 / 2.0),
-# )
+optimized_keys_x = [f"x{k}" for k in range(len(meas_odom_hist)+1)]
+#landmarks are a little annoying. find all indicies of lms measured, and then run on the unique set
+measurements_indices = []
+for i, zi in enumerate(values["z"]):
+        measurements_indices.extend(zi["indices"])
+measurements_indices = np.asarray(measurements_indices)
+optimized_keys_lm = [f"lm{k}" for k in np.unique(measurements_indices[:,1])]
+optimized_keys = optimized_keys_x + optimized_keys_lm
+
+
+optimizer = Optimizer(
+factors=factors,
+optimized_keys=optimized_keys,
+# Return problem stats for every iteration
+debug_stats=True,
+# Customize optimizer behavior
+params=Optimizer.Params(verbose=True, initial_lambda=1e4, lambda_down_factor=1 / 2.0),
+)
 # result = optimizer.optimize(values)

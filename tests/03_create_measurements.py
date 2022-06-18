@@ -26,11 +26,17 @@ x = geo.Pose3_SE3(R=geo.Rot3.identity(), t=geo.V3(np.array([5,0,0])))
 odom_cov = 0.1*np.eye(1)
 meas_cov = np.diag([1,np.radians(1),np.radians(1)])
 
+# a little confusing here:
+#
+#           MEASURE      MEASURE
+#x0 ->odom-> x1 -> odom ->x2 -> .....
+# we have k motions, and k measurement stations, but k+1 poses
+# we run on K measurement stations (starting at x1)
 K = 5
 gt_hist = [[] for k in range(K+1)]; gt_hist[0] = x
 meas_odom_hist = [[] for k in range(K)]
 meas_lm_hist = [[] for k in range(K)]
-for k in range(0,K):
+for k in range(K):
         #move
         x = x.compose(odom)
         
@@ -52,7 +58,7 @@ for k in range(0,K):
                 if -np.pi/2 <= theta <= np.pi/2 and r < 5.0:
                         z = np.random.multivariate_normal(np.array([r,theta,psi],dtype='float'),meas_cov)
                         zk_values.append(z)
-                        zk_indexes.append(np.array([k,index]))
+                        zk_indexes.append(np.array([k+1,index])) #K+1 poses
 
                         #help with: https://mathworld.wolfram.com/SphericalCoordinates.html
                         rel_lm_x = z[0] * np.cos(z[2]) * np.cos(z[1])
@@ -60,8 +66,8 @@ for k in range(0,K):
                         rel_lm_z = z[0] * np.sin(z[2])
                         zk_projections.append(np.array([rel_lm_x,rel_lm_y,rel_lm_z]))
 
-        meas_lm_hist[k] = ({"values": zk_values, "projections": zk_projections, "indexes": zk_indexes})
-        gt_hist[k+1] = x
+        meas_lm_hist[k] = ({"values": zk_values, "projections": zk_projections, "indices": zk_indexes})
+        gt_hist[k+1] = x #K+1 poses
 
 
 #plot 
@@ -75,7 +81,7 @@ ax.scatter3D(landmarks[:,0], landmarks[:,1], landmarks[:,2])
 for x in gt_hist:
         gt_graphics = plotPose3(ax,x)
 
-dr_x = gt_hist[0]
+dr_x = gt_hist[0].retract([0,0,0,0,0,0.1],epsilon) #move first pose just slightly so we can see difference in this 3D -> 1D problem
 dr_graphics = plotPose3(ax,dr_x,'gray')
 #dead reckoning + projections
 for k, o in enumerate(meas_odom_hist):
