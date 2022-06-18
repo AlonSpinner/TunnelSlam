@@ -76,16 +76,19 @@ values["z"] = meas_lm_hist
 # -----------------------------------------------------------------------------
 factors = []
 # measurements
-for i, zi in enumerate(values["z"]):
-        for j in range(len(zi)):
-                factors.append(
-                        Factor(residual = measurement_residual,
-                        keys = [
-                                f"x[z[{i}]['indices'][{j}][0]]",
-                                f"l[z[{i}]['indices'][{j}][1]]",
-                                f"z[{i}]['values'][{j}]",
-                                "meas_sqrtInfo",
-                        ]))
+# for i, zi in enumerate(values["z"]):
+#         for j in range(len(zi)):
+#                 x_ind = values["z"][i]['indices'][j][0]
+#                 l_ind = values["z"][i]['indices'][j][1]
+#                 meas_val = values["z"][i]['values']
+#                 factors.append(
+#                         Factor(residual = measurement_residual,
+#                         keys = [
+#                                 f"x[{x_ind}]",
+#                                 f"l[{l_ind}]",
+#                                 f"z[{meas_val}]",
+#                                 "meas_sqrtInfo",
+#                         ]))
 
 # odometrey
 for k in range(len(meas_odom_hist)):
@@ -121,3 +124,5 @@ debug_stats=True,
 params=Optimizer.Params(verbose=True, initial_lambda=1e4, lambda_down_factor=1 / 2.0),
 )
 # result = optimizer.optimize(values)
+
+print('done')
