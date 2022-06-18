@@ -22,14 +22,14 @@ file.close()
 
 odom = geo.Pose3_SE3(R=geo.Rot3.identity(), t= geo.Vector3(np.array([-2,0,0])))
 x = geo.Pose3_SE3(R=geo.Rot3.identity(), t=geo.Vector3(np.array([5,0,0])))
-odom_cov = 0.1*np.eye(1) * 0
-meas_cov = np.diag([0.1,np.radians(1),np.radians(1)]) * 0
+odom_cov = 0.1*np.eye(1)
+meas_cov = np.diag([1,np.radians(1),np.radians(1)])
 
 K = 5
-gt_hist = [[] for k in range(K)]; gt_hist[0] = x
-meas_odom_hist = [[] for k in range(K-1)]
-meas_lm_hist = [[] for k in range(K-1)]
-for k in range(0,K-1):
+gt_hist = [[] for k in range(K+1)]; gt_hist[0] = x
+meas_odom_hist = [[] for k in range(K)]
+meas_lm_hist = [[] for k in range(K)]
+for k in range(0,K):
         #move
         x = x.compose(odom)
         
@@ -42,9 +42,10 @@ for k in range(0,K-1):
         zk_indexes = []
         #measure landmarks
         for index,lm in enumerate(landmarks):
+                #z  = [r,yaw,pitch] ~ [r,theta,psi]
                 rel_lm = np.asarray(x.inverse() * geo.Vector3(lm),dtype = "float")
                 r = np.linalg.norm(rel_lm)
-                theta = np.arctan2(rel_lm[1],rel_lm[0]) #yaw
+                theta = np.arctan2(rel_lm[1],rel_lm[0]) #yaw #arctan2(y,x)
                 psi = np.arctan2(rel_lm[2],np.linalg.norm(rel_lm[:2])) #pitch
 
                 if -np.pi/2 <= theta <= np.pi/2 and r < 5.0:
@@ -52,12 +53,12 @@ for k in range(0,K-1):
                         zk_values.append(z)
                         zk_indexes.append(index)
 
-                        #https://en.wikipedia.org/wiki/Spherical_coordinate_system
-                        rel_lm_x = z[0] * np.sin(z[2]) * np.cos(z[1])
-                        rel_lm_y = z[0] * np.sin(z[2]) * np.sin(z[1])
-                        rel_lm_z = z[0] * np.cos(z[2])
-                        # zk_projections.append(np.array([rel_lm_x,rel_lm_y,rel_lm_z]))
-                        zk_projections.append(rel_lm)
+                        #help with: https://mathworld.wolfram.com/SphericalCoordinates.html
+                        rel_lm_x = z[0] * np.cos(z[2]) * np.cos(z[1])
+                        rel_lm_y = z[0] * np.cos(z[2]) * np.sin(z[1])
+                        rel_lm_z = z[0] * np.sin(z[2])
+                        zk_projections.append(np.array([rel_lm_x,rel_lm_y,rel_lm_z]))
+                        # zk_projections.append(rel_lm)
 
         meas_lm_hist[k] = ({"values": zk_values, "projections": zk_projections, "indexes": zk_indexes})
         gt_hist[k+1] = x
@@ -75,15 +76,16 @@ for x in gt_hist:
         gt_graphics = plotPose3(ax,x)
 
 dr_x = gt_hist[0]
+dr_graphics = plotPose3(ax,dr_x,'gray')
 #dead reckoning + projections
 for k, o in enumerate(meas_odom_hist):
-        dr_graphics = plotPose3(ax,dr_x,'gray')
-
         dr_x = dr_x.compose(o)
+        
+        dr_graphics = plotPose3(ax,dr_x,'gray')
 
         for rel_lm in np.array(meas_lm_hist[k]["projections"]):
                 lm = np.asarray(dr_x * geo.Vector3(rel_lm),dtype = "float")
-                ax.scatter3D(lm[0],lm[1],lm[2], c = 'r', s = 50, facecolors = 'none')
+                ax.scatter3D(lm[0],lm[1],lm[2], c = 'gray', marker = 'x')
 
 ax.legend([gt_graphics,dr_graphics],['ground truth','dead reckoning'])
 plt.show()
