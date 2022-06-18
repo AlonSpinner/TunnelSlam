@@ -1,4 +1,3 @@
-
 from symforce import geo
 from symforce import typing as T
 from symforce import sympy as sm
@@ -57,5 +56,5 @@ def odometry_residual(
         epsilon: Small number for singularity handling
     """
     predict = x1.inverse() * x2
-    tangent_error = predict.local_coordinates(odom, epsilon=epsilon)
+    tangent_error = predict.local_coordinates(odom, epsilon = epsilon)
     return T.cast(geo.V6, geo.M.diag(diagonal_sigmas.to_flat_list()).inv() * geo.V6(tangent_error))
