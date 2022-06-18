@@ -69,26 +69,30 @@ values["odom_sqrtInfo"] = geo.Matrix(cov2sqrtInfo(0.1*np.eye(1)))
 values["meas_sqrtInfo"] = geo.Matrix(cov2sqrtInfo(np.diag([0.1,np.radians(1),np.radians(1)])))
 values["epsilon"] = sm.default_epsilon
 values["odom"] = meas_odom_hist
-values["z"] = meas_lm_hist
+
+da = []
+z = []
+for i, zi in enumerate(meas_lm_hist):
+        da.append(zi["indices"])
+        z.append(zi["values"])
+values["z"] = z
+values["da"] = da
 
 # -----------------------------------------------------------------------------
-# Create Factors
+# Create Factors from values
 # -----------------------------------------------------------------------------
 factors = []
 # measurements
-# for i, zi in enumerate(values["z"]):
-#         for j in range(len(zi)):
-#                 x_ind = values["z"][i]['indices'][j][0]
-#                 l_ind = values["z"][i]['indices'][j][1]
-#                 meas_val = values["z"][i]['values']
-#                 factors.append(
-#                         Factor(residual = measurement_residual,
-#                         keys = [
-#                                 f"x[{x_ind}]",
-#                                 f"l[{l_ind}]",
-#                                 f"z[{meas_val}]",
-#                                 "meas_sqrtInfo",
-#                         ]))
+for zi, dai in zip(values["z"],values["da"]):
+        for j in range(len(zi)):
+                factors.append(
+                        Factor(residual = measurement_residual,
+                        keys = [
+                                f"x[{dai[j][0]}]",
+                                f"l[{dai[j][1]}]",
+                                f"z[{zi[j]}]",
+                                "meas_sqrtInfo",
+                        ]))
 
 # odometrey
 for k in range(len(meas_odom_hist)):
@@ -108,8 +112,8 @@ for k in range(len(meas_odom_hist)):
 optimized_keys_x = [f"x[{k}]" for k in range(len(meas_odom_hist)+1)]
 #landmarks are a little annoying. find all indicies of lms measured, and then run on the unique set
 measurements_indices = []
-for i, zi in enumerate(values["z"]):
-        measurements_indices.extend(zi["indices"])
+for dai in (values["da"]):
+        measurements_indices.extend(dai)
 measurements_indices = np.asarray(measurements_indices)
 optimized_keys_lm = [f"l[{k}]" for k in np.unique(measurements_indices[:,1])]
 optimized_keys = optimized_keys_x + optimized_keys_lm
@@ -123,6 +127,6 @@ debug_stats=True,
 # Customize optimizer behavior
 params=Optimizer.Params(verbose=True, initial_lambda=1e4, lambda_down_factor=1 / 2.0),
 )
-# result = optimizer.optimize(values)
+result = optimizer.optimize(values)
 
 print('done')
