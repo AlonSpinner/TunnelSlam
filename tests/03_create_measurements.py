@@ -2,6 +2,7 @@ import symforce
 symforce.set_backend("sympy")
 symforce.set_log_level("warning")
 from symforce import geo
+from symforce import sympy as sm
 import numpy as np
 import matplotlib.pyplot as plt
 from tunnelslam.plotting import plotPose3
@@ -20,8 +21,8 @@ file.close()
 
 #create odometry measurements
 
-odom = geo.Pose3_SE3(R=geo.Rot3.identity(), t= geo.Vector3(np.array([-2,0,0])))
-x = geo.Pose3_SE3(R=geo.Rot3.identity(), t=geo.Vector3(np.array([5,0,0])))
+odom = geo.Pose3_SE3(R=geo.Rot3.identity(), t= geo.V3(np.array([-2,0,0])))
+x = geo.Pose3_SE3(R=geo.Rot3.identity(), t=geo.V3(np.array([5,0,0])))
 odom_cov = 0.1*np.eye(1)
 meas_cov = np.diag([1,np.radians(1),np.radians(1)])
 
@@ -43,22 +44,21 @@ for k in range(0,K):
         #measure landmarks
         for index,lm in enumerate(landmarks):
                 #z  = [r,yaw,pitch] ~ [r,theta,psi]
-                rel_lm = np.asarray(x.inverse() * geo.Vector3(lm),dtype = "float")
-                r = np.linalg.norm(rel_lm)
-                theta = np.arctan2(rel_lm[1],rel_lm[0]) #yaw #arctan2(y,x)
-                psi = np.arctan2(rel_lm[2],np.linalg.norm(rel_lm[:2])) #pitch
+                rel_lm = x.inverse() * geo.V3(lm)
+                r = rel_lm.norm()
+                theta = sm.atan2(rel_lm[1],rel_lm[0]) #yaw #arctan2(y,x)
+                psi = sm.atan2(rel_lm[2],geo.V2(rel_lm[:2]).norm()) #pitch
 
                 if -np.pi/2 <= theta <= np.pi/2 and r < 5.0:
-                        z = np.random.multivariate_normal(np.array([r,theta,psi]),meas_cov)
+                        z = np.random.multivariate_normal(np.array([r,theta,psi],dtype='float'),meas_cov)
                         zk_values.append(z)
-                        zk_indexes.append(index)
+                        zk_indexes.append(np.array([k,index]))
 
                         #help with: https://mathworld.wolfram.com/SphericalCoordinates.html
                         rel_lm_x = z[0] * np.cos(z[2]) * np.cos(z[1])
                         rel_lm_y = z[0] * np.cos(z[2]) * np.sin(z[1])
                         rel_lm_z = z[0] * np.sin(z[2])
                         zk_projections.append(np.array([rel_lm_x,rel_lm_y,rel_lm_z]))
-                        # zk_projections.append(rel_lm)
 
         meas_lm_hist[k] = ({"values": zk_values, "projections": zk_projections, "indexes": zk_indexes})
         gt_hist[k+1] = x
@@ -84,7 +84,7 @@ for k, o in enumerate(meas_odom_hist):
         dr_graphics = plotPose3(ax,dr_x,'gray')
 
         for rel_lm in np.array(meas_lm_hist[k]["projections"]):
-                lm = np.asarray(dr_x * geo.Vector3(rel_lm),dtype = "float")
+                lm = np.asarray(dr_x * geo.V3(rel_lm),dtype = "float")
                 ax.scatter3D(lm[0],lm[1],lm[2], c = 'gray', marker = 'x')
 
 ax.legend([gt_graphics,dr_graphics],['ground truth','dead reckoning'])

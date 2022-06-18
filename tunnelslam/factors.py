@@ -1,27 +1,48 @@
 
 from symforce import geo
 from symforce import typing as T
+from symforce import sympy as sm
 
-def matching_residual(
-    world_T_body: geo.Pose3, world_t_landmark: geo.V3, body_t_landmark: geo.V3, sigma: T.Scalar
-) -> geo.V3:
+
+def radial(
+    x: geo.Pose3, lm: geo.V3, r : T.Scalar
+) -> T.Scalar:
     """
     Residual from a relative translation mesurement of a 3D pose to a landmark.
 
     Args:
-        world_T_body: 3D pose of the robot in the world frame
-        world_t_landmark: World location of the landmark
-        body_t_landmark: Measured body-frame location of the landmark
-        sigma: Isotropic standard deviation of the measurement [m]
+        x: 3D pose of the robot in the world frame
+        lm: World location of the landmark
     """
-    body_t_landmark_predicted = world_T_body.inverse() * world_t_landmark
-    return (body_t_landmark_predicted - body_t_landmark) / sigma
+    rel_lm = x.inverse() * lm
+    e = geo.V2(rel_lm[1:]).norm() - r
+    return e**2
+
+def measurement_residual(
+    x: geo.Pose3, lm: geo.V3, z: geo.V3, info: geo.Matrix33
+) -> T.Scalar:
+    """
+    Residual from a relative translation mesurement of a 3D pose to a landmark.
+
+    Args:
+        x: 3D pose of the robot in the world frame
+        lm: World location of the landmark
+        z: measured [range,yaw,pitch]
+        info: measurement information matrix
+    """
+    rel_lm = x.inverse() * lm
+    r = rel_lm.norm()
+    theta = sm.atan2(rel_lm[1],rel_lm[0]) #yaw #arctan2(y,x)
+    psi = sm.atan2(rel_lm[2],geo.V2(rel_lm[:2]).norm()) #pitch
+    h = geo.V3([r,theta,psi])
+    e = z-h
+    return e.T * info * e
 
 
 def odometry_residual(
-    world_T_a: geo.Pose3,
-    world_T_b: geo.Pose3,
-    a_T_b: geo.Pose3,
+    x1: geo.Pose3_SE3,
+    x2: geo.Pose3_SE3,
+    odom: geo.Pose3_SE3,
     diagonal_sigmas: geo.V6,
     epsilon: T.Scalar,
 ) -> geo.V6:
@@ -35,6 +56,6 @@ def odometry_residual(
         diagonal_sigmas: Diagonal standard deviation of the tangent-space error
         epsilon: Small number for singularity handling
     """
-    a_T_b_predicted = world_T_a.inverse() * world_T_b
-    tangent_error = a_T_b_predicted.local_coordinates(a_T_b, epsilon=epsilon)
+    predict = x1.inverse() * x2
+    tangent_error = predict.local_coordinates(odom, epsilon=epsilon)
     return T.cast(geo.V6, geo.M.diag(diagonal_sigmas.to_flat_list()).inv() * geo.V6(tangent_error))
