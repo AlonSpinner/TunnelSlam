@@ -1,6 +1,7 @@
 from symforce import geo
 from symforce import typing as T
 from symforce import sympy as sm
+import numpy as np
 
 
 def radial_residual(
@@ -47,7 +48,7 @@ def odometry_residual(
     x1: geo.Pose3_SE3,
     x2: geo.Pose3_SE3,
     odom: geo.Pose3_SE3,
-    sqrtInfo: geo.V6,
+    sqrtInfo: geo.Matrix66,
     epsilon: T.Scalar,
 ) -> geo.V6:
     """
@@ -62,4 +63,8 @@ def odometry_residual(
     """
     predict = x1.inverse() * x2
     tangent_error = predict.local_coordinates(odom, epsilon = epsilon)
-    return geo.V6, sqrtInfo * geo.V6(tangent_error)
+    return sqrtInfo * geo.V6(tangent_error)
+
+
+def cov2sqrtInfo(M : np.ndarray) -> np.ndarray:
+    return np.linalg.cholesky(M).T
