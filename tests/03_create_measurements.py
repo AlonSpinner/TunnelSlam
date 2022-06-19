@@ -24,7 +24,7 @@ file.close()
 odom = geo.Pose3(R=geo.Rot3.identity(), t= geo.V3(np.array([-2,0,0])))
 x = geo.Pose3(R=geo.Rot3.identity(), t=geo.V3(np.array([5,0,0])))
 odom_cov = 0.1*np.eye(1)
-meas_cov = np.diag([0.0001,np.radians(1),np.radians(1)])
+meas_cov = np.diag([0.1,np.radians(1),np.radians(1)])
 
 # a little confusing here:
 #
@@ -55,7 +55,7 @@ for k in range(K):
                 theta = sm.atan2(rel_lm[1],rel_lm[0]) #yaw #arctan2(y,x)
                 psi = sm.atan2(rel_lm[2],geo.V2(rel_lm[:2]).norm()) #pitch
 
-                if -np.pi/2 <= theta <= np.pi/2 and r < 5.0:
+                if -np.pi/2 <= theta <= np.pi/2 and r < 2.0:
                         z = np.random.multivariate_normal(np.array([r,theta,psi],dtype='float'),meas_cov)
                         zk_values.append(z)
                         zk_indexes.append(np.array([k+1,index])) #K+1 poses

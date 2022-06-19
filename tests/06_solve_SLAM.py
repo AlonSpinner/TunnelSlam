@@ -67,7 +67,7 @@ for id,proj in zip(measurements_indices,measurements_projections):
 values["l"] = initial_landmark_guesses
 
 odom_cov = np.eye(6);  odom_cov[3,3] = 0.1
-meas_cov = np.diag([0.0001,np.radians(1),np.radians(1)])
+meas_cov = np.diag([0.1,np.radians(1),np.radians(1)])
 values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(odom_cov)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(meas_cov)))
 values["epsilon"] = sm.default_epsilon
@@ -127,7 +127,7 @@ optimized_keys=optimized_keys,
 # Return problem stats for every iteration
 debug_stats=True,
 # Customize optimizer behavior
-params=Optimizer.Params(verbose=True)
+params=Optimizer.Params(verbose=True, enable_bold_updates = False)
 )
 result = optimizer.optimize(values)
 

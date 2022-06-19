@@ -67,7 +67,7 @@ for id,proj in zip(measurements_indices,measurements_projections):
 values["l"] = initial_landmark_guesses
 
 odom_cov = np.eye(6);  odom_cov[3,3] = 0.1
-meas_cov = np.diag([0.0001,np.radians(1),np.radians(1)])
+meas_cov = np.diag([0.1,np.radians(1),np.radians(1)])
 values["r"] = 1.0
 values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(odom_cov)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(meas_cov)))
@@ -173,6 +173,6 @@ for x in gt_x_hist:
         gt_graphics = plotPose3(ax,x,'red')
 ax.scatter3D(gt_landmarks[:,0], gt_landmarks[:,1], gt_landmarks[:,2])
 #add initial landmark guesses
-# initial_landmark_guesses = np.asarray([lm.to_numpy() for lm in initial_landmark_guesses])
-# ax.scatter3D(initial_landmark_guesses[:,0], initial_landmark_guesses[:,1], initial_landmark_guesses[:,2],c = 'orange', marker = 'd')
+initial_landmark_guesses = np.asarray([lm.to_numpy() for lm in initial_landmark_guesses])
+ax.scatter3D(initial_landmark_guesses[:,0], initial_landmark_guesses[:,1], initial_landmark_guesses[:,2],c = 'orange', marker = 'd')
 plt.show()
