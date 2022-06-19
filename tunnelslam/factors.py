@@ -24,7 +24,7 @@ def measurement_residual(
     x: geo.Pose3,
     lm: geo.V3, 
     z: geo.V3, 
-    sqsrtInfo: geo.Matrix33
+    sqsrtInfo: geo.V3 #diagonal of sqrt information matrix
 ) -> geo.V3:
     """
     Residual from a relative translation mesurement of a 3D pose to a landmark.
@@ -41,29 +41,29 @@ def measurement_residual(
     psi = sm.atan2(rel_lm[2],geo.V2(rel_lm[:2]).norm()) #pitch
     h = geo.V3([r,theta,psi])
     e = z-h
-    return sqsrtInfo * e
+    return geo.M.diag(sqsrtInfo) * e
 
 
 def odometry_residual(
     x1: geo.Pose3,
     x2: geo.Pose3,
     odom: geo.Pose3,
-    sqrtInfo: geo.Matrix66,
+    sqrtInfo: geo.V6, #diagonal of sqrt information matrix
     epsilon: T.Scalar,
 ) -> geo.V6:
     """
     Residual on the relative pose between two timesteps of the robot.
 
     Args:
-        world_T_a: First pose in the world frame
-        world_T_b: Second pose in the world frame
-        a_T_b: Relative pose measurement between the poses
+        x1: First pose
+        x2: Second pose
+        odom: Relative pose measurement between the poses
         sqrtInfo: Sqrt information matrix
         epsilon: Small number for singularity handling
     """
     predict = x1.inverse() * x2
     tangent_error = predict.local_coordinates(odom, epsilon = epsilon)
-    return sqrtInfo * geo.V6(tangent_error)
+    return geo.M.diag(sqrtInfo) * geo.V6(tangent_error)
 
 
 def cov2sqrtInfo(M : np.ndarray) -> np.ndarray:

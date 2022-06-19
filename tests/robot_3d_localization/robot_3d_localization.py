@@ -230,7 +230,7 @@ def main() -> None:
 
     # Create the optimizer
     optimizer = Optimizer(
-        factors=factors,
+        factors=list(factors),
         optimized_keys=optimized_keys,
         # Return problem stats for every iteration
         debug_stats=True,
