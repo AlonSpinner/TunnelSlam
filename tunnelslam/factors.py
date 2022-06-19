@@ -18,14 +18,14 @@ def radial_residual(
     """
     rel_lm = x.inverse() * lm
     e = geo.V2(rel_lm[1:]).norm() - r
-    return e**2
+    return e
 
 def measurement_residual(
     x: geo.Pose3,
     lm: geo.V3, 
     z: geo.V3, 
     sqsrtInfo: geo.Matrix33
-) -> T.Scalar:
+) -> geo.V3:
     """
     Residual from a relative translation mesurement of a 3D pose to a landmark.
 
@@ -45,9 +45,9 @@ def measurement_residual(
 
 
 def odometry_residual(
-    x1: geo.Pose3_SE3,
-    x2: geo.Pose3_SE3,
-    odom: geo.Pose3_SE3,
+    x1: geo.Pose3,
+    x2: geo.Pose3,
+    odom: geo.Pose3,
     sqrtInfo: geo.Matrix66,
     epsilon: T.Scalar,
 ) -> geo.V6:

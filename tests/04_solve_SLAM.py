@@ -36,7 +36,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 filename = os.path.join(dir_path,'out','meas_odom_hist.pickle')
 file = open(filename, 'rb')
 meas_odom_hist = pickle.load(file)
-meas_odom_hist = [geo.Pose3_SE3.from_storage(o) for o in meas_odom_hist]
+meas_odom_hist = [geo.Pose3.from_storage(o) for o in meas_odom_hist]
 file.close()
 
 # -----------------------------------------------------------------------------
@@ -46,7 +46,7 @@ values = Values()
 
 #initial guesses for poses from dead reckoning
 x_initial = [[] for _ in range(len(meas_odom_hist)+1)]
-dr_x = geo.Pose3_SE3(R=geo.Rot3.identity(), t=geo.Vector3(np.array([5,0,0])))
+dr_x = geo.Pose3(R=geo.Rot3.identity(), t=geo.Vector3(np.array([5,0,0])))
 x_initial[0] = dr_x
 for k,o in enumerate(meas_odom_hist):
         dr_x = dr_x.compose(o)
@@ -83,14 +83,14 @@ values["da"] = da
 # -----------------------------------------------------------------------------
 factors = []
 # measurements
-for zi, dai in zip(values["z"],values["da"]):
-        for j in range(len(zi)):
+for i, dai in enumerate(values["da"]):
+        for j in range(len(dai)):
                 factors.append(
                         Factor(residual = measurement_residual,
                         keys = [
                                 f"x[{dai[j][0]}]",
                                 f"l[{dai[j][1]}]",
-                                f"z[{zi[j]}]",
+                                f"z[{i}][{j}]",
                                 "meas_sqrtInfo",
                         ]))
 
@@ -117,7 +117,6 @@ for dai in (values["da"]):
 measurements_indices = np.asarray(measurements_indices)
 optimized_keys_lm = [f"l[{k}]" for k in np.unique(measurements_indices[:,1])]
 optimized_keys = optimized_keys_x + optimized_keys_lm
-
 
 optimizer = Optimizer(
 factors=factors,
