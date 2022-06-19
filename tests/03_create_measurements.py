@@ -55,7 +55,7 @@ for k in range(K):
                 theta = sm.atan2(rel_lm[1],rel_lm[0]) #yaw #arctan2(y,x)
                 psi = sm.atan2(rel_lm[2],geo.V2(rel_lm[:2]).norm()) #pitch
 
-                if -np.pi/2 <= theta <= np.pi/2 and r < 2.0:
+                if -np.pi/2 <= theta <= np.pi/2 and r < 10.0:
                         z = np.random.multivariate_normal(np.array([r,theta,psi],dtype='float'),meas_cov)
                         zk_values.append(z)
                         zk_indexes.append(np.array([k+1,index])) #K+1 poses
