@@ -66,7 +66,7 @@ for id,proj in zip(measurements_indices,measurements_projections):
        initial_landmark_guesses[id[1]] = x_initial[id[0]] * proj #plant a dead reckoning projection in list
 values["l"] = initial_landmark_guesses
 
-odom_cov = np.eye(6);  odom_cov[3,3] = 0.1
+odom_cov = np.eye(6);  odom_cov[3,3] = 0.01
 meas_cov = np.diag([0.1,np.radians(1),np.radians(1)])
 values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(odom_cov)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(meas_cov)))
@@ -143,7 +143,7 @@ ax = plt.axes(projection='3d',
         xlim = (-15,10), ylim = (-5,5), zlim = (-5,5),
         xlabel = 'x', ylabel = 'y', zlabel = 'z')
 ax.set_box_aspect(aspect = (1,1,1))
-ax.scatter3D(landmarks[:,0], landmarks[:,1], landmarks[:,2],c = 'gray', marker = 'x')
+ax.scatter3D(landmarks[:,0], landmarks[:,1], landmarks[:,2],c = 'orange', marker = 'd')
 for x in poses:
         gt_graphics = plotPose3(ax,x,'gray')
 
@@ -168,5 +168,5 @@ for x in gt_x_hist:
 ax.scatter3D(gt_landmarks[:,0], gt_landmarks[:,1], gt_landmarks[:,2])
 #add initial landmark guesses
 initial_landmark_guesses = np.asarray([lm.to_numpy() for lm in initial_landmark_guesses])
-ax.scatter3D(initial_landmark_guesses[:,0], initial_landmark_guesses[:,1], initial_landmark_guesses[:,2],c = 'orange', marker = 'd')
+ax.scatter3D(initial_landmark_guesses[:,0], initial_landmark_guesses[:,1], initial_landmark_guesses[:,2],c = 'gray', marker = 'x')
 plt.show()

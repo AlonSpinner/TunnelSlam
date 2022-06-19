@@ -24,7 +24,7 @@ def measurement_residual(
     x: geo.Pose3,
     lm: geo.V3, 
     z: geo.V3, 
-    sqsrtInfo: geo.V3 #diagonal of sqrt information matrix
+    sqrtInfo: geo.V3 #diagonal of sqrt information matrix
 ) -> geo.V3:
     """
     Residual from a relative translation mesurement of a 3D pose to a landmark.
@@ -41,7 +41,7 @@ def measurement_residual(
     psi = sm.atan2(rel_lm[2],geo.V2(rel_lm[:2]).norm()) #pitch
     h = geo.V3([r,theta,psi])
     e = z-h
-    return geo.M.diag(sqsrtInfo) * e
+    return geo.M.diag(sqrtInfo) * e
 
 
 def odometry_residual(

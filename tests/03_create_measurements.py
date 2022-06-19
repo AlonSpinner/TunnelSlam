@@ -23,7 +23,7 @@ file.close()
 
 odom = geo.Pose3(R=geo.Rot3.identity(), t= geo.V3(np.array([-2,0,0])))
 x = geo.Pose3(R=geo.Rot3.identity(), t=geo.V3(np.array([5,0,0])))
-odom_cov = 0.1*np.eye(1)
+odom_cov = 0.01*np.eye(1)
 meas_cov = np.diag([0.1,np.radians(1),np.radians(1)])
 
 # a little confusing here:
