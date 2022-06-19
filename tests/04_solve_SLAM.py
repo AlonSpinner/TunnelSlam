@@ -66,13 +66,13 @@ for id,proj in zip(measurements_indices,measurements_projections):
         values["l"][id[1]] = x_initial[id[0]] * proj #plant a dead reckoning projection in list
 
 odom_cov = np.eye(6);  odom_cov[3,3] = 0.1
-meas_cov = np.diag([0.1,np.radians(1),np.radians(1)])
+meas_cov = np.diag([0.0001,np.radians(1),np.radians(1)])
 values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(odom_cov)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(meas_cov)))
 values["epsilon"] = sm.default_epsilon
 values["odom"] = meas_odom_hist
 
-da = []
+da = [] #data assosication
 z = []
 for i, zi in enumerate(meas_lm_hist):
         da.append(zi["indices"])
@@ -126,8 +126,43 @@ optimized_keys=optimized_keys,
 # Return problem stats for every iteration
 debug_stats=True,
 # Customize optimizer behavior
-params=Optimizer.Params(verbose=True, initial_lambda=1e4, lambda_down_factor=1 / 2.0),
+params=Optimizer.Params(verbose=True)
 )
 result = optimizer.optimize(values)
 
-print('done')
+optVals = result.optimized_values
+
+landmarks = np.array(optVals["l"])
+poses = [geo.Pose3.from_storage(xi.to_storage()) for xi in optVals["x"]]
+# -----------------------------------------------------------------------------
+# plot
+# -----------------------------------------------------------------------------
+fig = plt.figure()
+ax = plt.axes(projection='3d',
+        xlim = (-15,10), ylim = (-5,5), zlim = (-5,5),
+        xlabel = 'x', ylabel = 'y', zlabel = 'z')
+ax.set_box_aspect(aspect = (1,1,1))
+ax.scatter3D(landmarks[:,0], landmarks[:,1], landmarks[:,2],c = 'gray', marker = 'x')
+for x in poses:
+        gt_graphics = plotPose3(ax,x,'gray')
+
+#load lm ground truth
+#obtain landmarks
+dir_path = os.path.dirname(os.path.realpath(__file__))
+filename = os.path.join(dir_path,'out','landmarks.pickle')
+file = open(filename, 'rb')
+gt_landmarks = pickle.load(file)
+file.close()
+#load gt_x_hist
+dir_path = os.path.dirname(os.path.realpath(__file__))
+filename = os.path.join(dir_path,'out','gt_x_hist.pickle')
+file = open(filename, 'rb')
+gt_x_hist = pickle.load(file)
+gt_x_hist = [geo.Pose3.from_storage(o) for o in gt_x_hist]
+file.close()
+
+#add ground truth to plot
+for x in gt_x_hist:
+        gt_graphics = plotPose3(ax,x,'red')
+ax.scatter3D(gt_landmarks[:,0], gt_landmarks[:,1], gt_landmarks[:,2])
+plt.show()

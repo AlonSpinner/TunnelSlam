@@ -24,7 +24,7 @@ file.close()
 odom = geo.Pose3(R=geo.Rot3.identity(), t= geo.V3(np.array([-2,0,0])))
 x = geo.Pose3(R=geo.Rot3.identity(), t=geo.V3(np.array([5,0,0])))
 odom_cov = 0.1*np.eye(1)
-meas_cov = np.diag([1,np.radians(1),np.radians(1)])
+meas_cov = np.diag([0.0001,np.radians(1),np.radians(1)])
 
 # a little confusing here:
 #
@@ -104,10 +104,14 @@ file = open(filename, 'wb')
 pickle.dump(meas_lm_hist,file)
 file.close()
 
-
 filename = os.path.join(dir_path,'out','meas_odom_hist.pickle')
 file = open(filename, 'wb')
 pickle.dump([o.to_storage() for o in meas_odom_hist],file)
+file.close()
+
+filename = os.path.join(dir_path,'out','gt_x_hist.pickle')
+file = open(filename, 'wb')
+pickle.dump([o.to_storage() for o in gt_hist],file)
 file.close()
 
 
