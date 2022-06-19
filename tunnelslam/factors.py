@@ -8,7 +8,7 @@ def radial_residual(
     x: geo.Pose3, 
     lm: geo.V3, 
     r : T.Scalar
-) -> T.Scalar:
+) -> geo.V1:
     """
     Residual from a relative translation mesurement of a 3D pose to a landmark.
 
@@ -18,7 +18,7 @@ def radial_residual(
     """
     rel_lm = x.inverse() * lm
     e = geo.V2(rel_lm[1:]).norm() - r
-    return e
+    return geo.V1(e)
 
 def measurement_residual(
     x: geo.Pose3,

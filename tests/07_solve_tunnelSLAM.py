@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from tunnelslam.plotting import plotPose3
-from tunnelslam.factors import cov2sqrtInfo, measurement_residual, odometry_residual
+from tunnelslam.factors import cov2sqrtInfo, radial_residual, measurement_residual, odometry_residual
 import pickle
 import os
 
@@ -68,6 +68,7 @@ values["l"] = initial_landmark_guesses
 
 odom_cov = np.eye(6);  odom_cov[3,3] = 0.1
 meas_cov = np.diag([0.0001,np.radians(1),np.radians(1)])
+values["r"] = 1.0
 values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(odom_cov)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(meas_cov)))
 values["epsilon"] = sm.default_epsilon
@@ -96,6 +97,13 @@ for i, dai in enumerate(values["da"]):
                                 f"z[{i}][{j}]",
                                 "meas_sqrtInfo",
                         ]))
+                factors.append(
+                Factor(residual = radial_residual,
+                keys = [
+                        f"x[{dai[j][0]}]",
+                        f"l[{dai[j][1]}]",
+                        "r",
+                ]))
 
 # odometrey
 for k in range(len(values["odom"])):
@@ -108,7 +116,6 @@ for k in range(len(values["odom"])):
                         "odom_sqrtInfo",
                         "epsilon",
                 ]))
-
 # -----------------------------------------------------------------------------
 # optimize
 # -----------------------------------------------------------------------------
@@ -127,7 +134,7 @@ optimized_keys=optimized_keys,
 # Return problem stats for every iteration
 debug_stats=True,
 # Customize optimizer behavior
-params=Optimizer.Params(verbose=True)
+params=Optimizer.Params(verbose=True, initial_lambda=1e4, lambda_down_factor=1 / 2.0),
 )
 result = optimizer.optimize(values)
 
@@ -161,12 +168,11 @@ file = open(filename, 'rb')
 gt_x_hist = pickle.load(file)
 gt_x_hist = [geo.Pose3.from_storage(o) for o in gt_x_hist]
 file.close()
-
 #add ground truth to plot
 for x in gt_x_hist:
         gt_graphics = plotPose3(ax,x,'red')
 ax.scatter3D(gt_landmarks[:,0], gt_landmarks[:,1], gt_landmarks[:,2])
 #add initial landmark guesses
-initial_landmark_guesses = np.asarray([lm.to_numpy() for lm in initial_landmark_guesses])
-ax.scatter3D(initial_landmark_guesses[:,0], initial_landmark_guesses[:,1], initial_landmark_guesses[:,2],c = 'orange', marker = 'd')
+# initial_landmark_guesses = np.asarray([lm.to_numpy() for lm in initial_landmark_guesses])
+# ax.scatter3D(initial_landmark_guesses[:,0], initial_landmark_guesses[:,1], initial_landmark_guesses[:,2],c = 'orange', marker = 'd')
 plt.show()
