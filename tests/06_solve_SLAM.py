@@ -159,9 +159,10 @@ ax.set_box_aspect(aspect = (1,1,1))
 landmarks = np.array(optVals["l"])
 opt_lm_id = np.unique(measurements_indices[:,1])
 poses = [geo.Pose3.from_storage(xi.to_storage()) for xi in optVals["x"]]
-ax.scatter3D(landmarks[opt_lm_id,0], landmarks[opt_lm_id,1], landmarks[opt_lm_id,2],c = 'orange', marker = 'd')
+opt_graphics = ax.scatter3D(landmarks[opt_lm_id,0], landmarks[opt_lm_id,1], landmarks[opt_lm_id,2], \
+        c = 'orange', marker = 'd')
 for x in poses:
-        gt_graphics = plotPose3(ax,x,'gray')
+        plotPose3(ax,x,'orange')
 
 #load lm ground truth
 #obtain landmarks
@@ -180,10 +181,12 @@ file.close()
 
 #add ground truth to plot
 for x in gt_x_hist:
-        gt_graphics = plotPose3(ax,x,'red')
-ax.scatter3D(gt_landmarks[opt_lm_id,0], gt_landmarks[opt_lm_id,1], gt_landmarks[opt_lm_id,2])
+        plotPose3(ax,x,'red')
+gt_graphics = ax.scatter3D(gt_landmarks[opt_lm_id,0], gt_landmarks[opt_lm_id,1], gt_landmarks[opt_lm_id,2])
 #add initial landmark guesses
 initial_landmark_guesses = np.asarray([lm.to_numpy() for lm in initial_landmark_guesses])
-ax.scatter3D(initial_landmark_guesses[opt_lm_id,0], initial_landmark_guesses[opt_lm_id,1], \
+initial_graphics = ax.scatter3D(initial_landmark_guesses[opt_lm_id,0], initial_landmark_guesses[opt_lm_id,1], \
         initial_landmark_guesses[opt_lm_id,2],c = 'gray', marker = 'x')
+
+ax.legend([opt_graphics, gt_graphics ,initial_graphics],["optimized","ground truth","initial"])
 plt.show()

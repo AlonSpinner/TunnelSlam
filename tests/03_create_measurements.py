@@ -82,12 +82,12 @@ for x in gt_hist:
         gt_graphics = plotPose3(ax,x)
 
 dr_x = gt_hist[0].retract([0,0,0,0,0,0.1],epsilon) #move first pose just slightly so we can see difference in this 3D -> 1D problem
-dr_graphics = plotPose3(ax,dr_x,'gray')
+dr_graphics = plotPose3(ax,dr_x,'orange')
 #dead reckoning + projections
 for k, o in enumerate(meas_odom_hist):
         dr_x = dr_x.compose(o)
         
-        dr_graphics = plotPose3(ax,dr_x,'gray')
+        dr_graphics = plotPose3(ax,dr_x,'orange')
 
         for rel_lm in np.array(meas_lm_hist[k]["projections"]):
                 lm = np.asarray(dr_x * geo.V3(rel_lm),dtype = "float")
