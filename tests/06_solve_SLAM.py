@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from tunnelslam.plotting import plotPose3
-from tunnelslam.factors import cov2sqrtInfo, measurement_residual, odometry_residual
+from tunnelslam.factors import cov2sqrtInfo, measurement_residual, odometry_residual, pose3prior_residual
 import pickle
 import os
 
@@ -52,6 +52,7 @@ for k,o in enumerate(meas_odom_hist):
         dr_x = dr_x.compose(o)
         x_initial[k+1] = dr_x
 values["x"] = x_initial
+values["x0"] = x_initial[0]
 
 #initial gusses for landmarks from dead reckoning
 measurements_indices = [] #just collect these two terms nicely
@@ -68,8 +69,10 @@ values["l"] = initial_landmark_guesses
 
 odom_cov = np.eye(6);  odom_cov[3,3] = 0.01
 meas_cov = np.diag([0.1,np.radians(1),np.radians(1)])
+prior_cov = np.eye(6);  odom_cov[3,3] = 0.0001
 values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(odom_cov)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(meas_cov)))
+values["prior_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(prior_cov)))
 values["epsilon"] = sm.default_epsilon
 values["odom"] = meas_odom_hist
 
@@ -85,6 +88,16 @@ values["da"] = da
 # Create Factors from values
 # -----------------------------------------------------------------------------
 factors = []
+#prior
+factors.append(
+        Factor(residual = pose3prior_residual,
+        keys = [
+                f"x[0]",
+                "x0",
+                "prior_sqrtInfo",
+                "epsilon"
+        ]))
+
 # measurements
 for i, dai in enumerate(values["da"]):
         for j in range(len(dai)):

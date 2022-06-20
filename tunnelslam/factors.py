@@ -65,6 +65,24 @@ def odometry_residual(
     tangent_error = predict.local_coordinates(odom, epsilon = epsilon)
     return geo.M.diag(sqrtInfo) * geo.V6(tangent_error)
 
+def pose3prior_residual(
+    x : geo.Pose3, 
+    x0: geo.Pose3, 
+    sqrtInfo: geo.V6,
+    epsilon: T.Scalar):
+
+    '''
+    Args:
+    x: pose
+    x0: prior pose
+    sqrtInfo: Sqrt information matrix
+    epsilon: Small number for singularity handling
+    '''
+
+    predict = x0.inverse() * x
+    tangent_error = predict.to_tangent(epsilon = epsilon)
+    return geo.M.diag(sqrtInfo) * geo.V6(tangent_error)
+
 
 def cov2sqrtInfo(M : np.ndarray) -> np.ndarray:
     return np.linalg.cholesky(M).T
