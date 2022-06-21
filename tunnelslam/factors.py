@@ -3,23 +3,6 @@ from symforce import typing as T
 from symforce import sympy as sm
 import numpy as np
 
-
-def radial_residual(
-    x: geo.Pose3, 
-    lm: geo.V3, 
-    r : T.Scalar
-) -> geo.V1:
-    """
-    Residual from a relative translation mesurement of a 3D pose to a landmark.
-
-    Args:
-        x: 3D pose of the robot in the world frame
-        lm: World location of the landmark
-    """
-    rel_lm = x.inverse() * lm
-    e = geo.V2(rel_lm[1:]).norm() - r
-    return geo.V1(e)
-
 def measurement_residual(
     x: geo.Pose3,
     lm: geo.V3, 
@@ -83,6 +66,50 @@ def pose3prior_residual(
     tangent_error = predict.to_tangent(epsilon = epsilon)
     return geo.M.diag(sqrtInfo) * geo.V6(tangent_error)
 
+def radial_residual(
+    x: geo.Pose3, 
+    lm: geo.V3, 
+    r : T.Scalar
+) -> geo.V1:
+    """
+        x: 3D pose of the robot in the world frame
+        lm: World location of the landmark
+    """
+    rel_lm = x.inverse() * lm
+    e = geo.V2(rel_lm[1:]).norm() - r
+    return geo.V1(e)
+
+def radial_residual2(
+    s : T.Scalar,
+    x1 : geo.Pose3,
+    x2 : geo.Pose3,
+    lm : geo.V3,
+    r : T.Scalar,
+    d : T.Scalar
+    ):
+    """
+    s - running parameter s in [0,1] .. how do we constrain?
+    x1 - pose at s = 0
+    x2 - pose at s = 1
+    lm - landmark
+    r - tunnel radius
+    d - 1 if this factor is relevant, 0 otherwise (that is, if lm is attached to this spline)
+    """
+    #lets assume m derivatives were calculated for now...
+    p0 = x1.t
+    m0 = x1.R.to_rotation_matrix()[:,0]
+    p1 = x2.t
+    m1 = x2.R.to_rotation_matrix()[:,0]
+
+    #lets create a curve with some running parameter u
+    splinePoint = (2*s**3-3*s**2+1) * p0 \
+            + (s**3 - 2*s**2 + s) * m0 \
+            + (-2*s**3 + 3*s**2) * p1 \
+            + (s**3 - s**2) * m1
+
+    rhat = (lm-splinePoint).norm()
+    e = (rhat - r) * d
+    return geo.V1(e)
 
 def cov2sqrtInfo(M : np.ndarray) -> np.ndarray:
     return np.linalg.cholesky(M).T
