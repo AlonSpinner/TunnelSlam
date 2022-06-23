@@ -1,0 +1,8 @@
+$ conda create --name tunnelslam python=3.10
+$ conda activate tunnelslam
+$ pip install symforce
+
+papers:
+A closed-form solution to the inverse problem in interpolation by a Bézier-spline curve
+A Variational Model for Data Fitting on Manifolds by Minimizing the Acceleration of a Bézier Curve
+Continuous-Time vs. Discrete-Time Vision-based SLAM: A Comparative Study

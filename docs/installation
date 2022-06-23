@@ -1,3 +1,0 @@
-$ conda create --name tunnelslam python=3.10
-$ conda activate tunnelslam
-$ pip install symforce
