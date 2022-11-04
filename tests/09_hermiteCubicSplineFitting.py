@@ -1,3 +1,4 @@
+import re
 from symforce import geo
 from symforce import typing as T
 from symforce import sympy as sm
@@ -31,12 +32,29 @@ f_spline = lambda s: (2*s**3-3*s**2+1) * p0 \
 
 N = 100 #amount of points on curve
 std = 0.4
-t = np.linspace(0,1,N)
+gt_s = np.linspace(0,1,N)
 z, spline_gt = np.zeros((N,3)), np.zeros((N,3))
-for i, ti in enumerate(t):
-    spline_gt[i] = f_spline(ti)
-    z[i] = f_spline(ti) + np.random.normal(0.0,std,3)
+for i, si in enumerate(gt_s):
+    spline_gt[i] = f_spline(si)
+    z[i] = f_spline(si) + np.random.normal(0.0,std,3)
 
+# -----------------------------------------------------------------------------
+# Build Values
+# -----------------------------------------------------------------------------
+values = Values()
+values["p0"] = p0
+values["m0"] = m0
+values["p1"] = p1
+values["m1"] = m1
+values["z"] = [zi for zi in z]
+values["meas_sqrtInfo"] = geo.V3(std**2 * np.ones(3))
+
+s_init = [np.random.uniform(0.0 ,1.0) for _ in range(len(z))]
+values["s"] = s_init 
+
+# -----------------------------------------------------------------------------
+# Create Factors from values
+# -----------------------------------------------------------------------------
 def measurement_residual(
     s : T.Scalar,
     p0: geo.V3,
@@ -54,21 +72,28 @@ def measurement_residual(
     e = z-splinePoint
     return geo.M.diag(sqrtInfo) * e
 
-# -----------------------------------------------------------------------------
-# Build Values
-# -----------------------------------------------------------------------------
-values = Values()
-values["p0"] = p0
-values["m0"] = m0
-values["p1"] = p1
-values["m1"] = m1
-values["z"] = [zi for zi in z]
-values["meas_sqrtInfo"] = geo.V3(std**2 * np.ones(3))
-values["s"] = [np.random.uniform(0.0 ,1.0) for _ in range(len(z))]
+# K = 1.5
+# eps = 1e-6
+# lower_lim, upper_lim = 0.0, 1.0
+# def boundry_factor(
+#     s : T.Scalar) -> geo.V1:
+#     if s < lower_lim + eps:
+#         return geo.V1(K * abs(s - lower_lim))
+#     elif s > upper_lim - eps:
+#         return geo.V1(K * abs(s - upper_lim))
+#     else:
+#         return geo.V1(0.0)
 
-# -----------------------------------------------------------------------------
-# Create Factors from values
-# -----------------------------------------------------------------------------
+K = 0.05
+eps = 1e-2
+lower_lim, upper_lim = 0.0, 1.0
+def boundry_factor(
+    s : T.Scalar) -> geo.V1:
+    dmin = abs(lower_lim - s)
+    dmax = abs(upper_lim-s)
+    e = K*(1/(dmax+eps) * 1/(dmin+eps))
+    return geo.V1(e)
+
 factors = []
 
 # measurements
@@ -83,6 +108,14 @@ for i in range(len(z)):
                     "m1",
                     f"z[{i}]",
                     "meas_sqrtInfo",
+            ]))
+
+#boundries for s
+for i in range(len(s_init)):
+    factors.append(
+            Factor(residual = boundry_factor,
+            keys = [
+                    f"s[{i}]"
             ]))
 # -----------------------------------------------------------------------------
 # optimize
@@ -99,7 +132,7 @@ params=Optimizer.Params(verbose=True, enable_bold_updates = False)
 result = optimizer.optimize(values)
 optVals = result.optimized_values
 
-opt_s = np.clip(np.array(optVals["s"]),0,1)
+opt_s = np.array(optVals["s"])
 spline_opt = np.zeros((len(opt_s),3))
 for i, s in enumerate(opt_s):
     spline_opt[i] = f_spline(s)
@@ -115,4 +148,11 @@ ax.scatter3D(z[:,0], z[:,1], z[:,2])
 ax.scatter3D(spline_opt[:,0], spline_opt[:,1], spline_opt[:,2])
 plotPose3(ax,x1)
 plotPose3(ax,x2)
+
+fig = plt.figure()
+ax = fig.add_subplot(111)
+ax.plot(gt_s)
+ax.plot(opt_s)
+ax.legend(["s -  ground truth","s - optimized"])
+
 plt.show()
