@@ -47,7 +47,7 @@ values["m0"] = m0
 values["p1"] = p1
 values["m1"] = m1
 values["z"] = [zi for zi in z]
-values["meas_sqrtInfo"] = geo.V3(std**2 * np.ones(3))
+values["meas_sqrtInfo"] = geo.V1(1/(3*std**2))
 
 s_init = [np.random.uniform(0.0 ,1.0) for _ in range(len(z))]
 values["s"] = s_init 
@@ -62,37 +62,27 @@ def measurement_residual(
     p1: geo.V3,
     m1: geo.V3,
     z: geo.V3, 
-    sqrtInfo: geo.V3 #diagonal of sqrt information matrix
-    ) -> geo.V3:
+    sqrtInfo: geo.V1 #diagonal of sqrt information matrix
+    ) -> geo.V1:
     splinePoint = (2*s**3-3*s**2+1) * p0 \
         + (s**3 - 2*s**2 + s) * m0 \
         + (-2*s**3 + 3*s**2) * p1 \
         + (s**3 - s**2) * m1
 
-    e = z-splinePoint
-    return geo.M.diag(sqrtInfo) * e
+    e = (z-splinePoint).norm()
+    return sqrtInfo * e
 
-# K = 1.5
-# eps = 1e-6
-# lower_lim, upper_lim = 0.0, 1.0
-# def boundry_factor(
-#     s : T.Scalar) -> geo.V1:
-#     if s < lower_lim + eps:
-#         return geo.V1(K * abs(s - lower_lim))
-#     elif s > upper_lim - eps:
-#         return geo.V1(K * abs(s - upper_lim))
-#     else:
-#         return geo.V1(0.0)
-
-K = 0.05
-eps = 1e-2
+K = 20.0
+eps = 0.01
 lower_lim, upper_lim = 0.0, 1.0
 def boundry_factor(
     s : T.Scalar) -> geo.V1:
-    dmin = abs(lower_lim - s)
-    dmax = abs(upper_lim-s)
-    e = K*(1/(dmax+eps) * 1/(dmin+eps))
-    return geo.V1(e)
+    if s < lower_lim + eps:
+        return geo.V1(K * abs(s - lower_lim))
+    elif s > upper_lim - eps:
+        return geo.V1(K * abs(s - upper_lim))
+    else:
+        return geo.V1(0.0)
 
 factors = []
 
@@ -127,7 +117,12 @@ optimized_keys=optimized_keys,
 # Return problem stats for every iteration
 debug_stats=True,
 # Customize optimizer behavior
-params=Optimizer.Params(verbose=True, enable_bold_updates = False)
+params=Optimizer.Params(verbose=True,
+                        enable_bold_updates = False,
+                        iterations = 100,
+                        use_diagonal_damping = True,
+                        use_unit_damping = True,
+                        initial_lambda = 10)
 )
 result = optimizer.optimize(values)
 optVals = result.optimized_values
@@ -138,16 +133,16 @@ for i, s in enumerate(opt_s):
     spline_opt[i] = f_spline(s)
 
 #plot 
-fig = plt.figure()
-ax = plt.axes(projection='3d',
-        xlim = (-5,15), ylim = (-5,15), zlim = (-5,5),
-        xlabel = 'x', ylabel = 'y', zlabel = 'z')
-ax.set_box_aspect(aspect = (1,1,1))
-ax.scatter3D(spline_gt[:,0], spline_gt[:,1], spline_gt[:,2])
-ax.scatter3D(z[:,0], z[:,1], z[:,2])
-ax.scatter3D(spline_opt[:,0], spline_opt[:,1], spline_opt[:,2])
-plotPose3(ax,x1)
-plotPose3(ax,x2)
+# fig = plt.figure()
+# ax = plt.axes(projection='3d',
+#         xlim = (-5,15), ylim = (-5,15), zlim = (-5,5),
+#         xlabel = 'x', ylabel = 'y', zlabel = 'z')
+# ax.set_box_aspect(aspect = (1,1,1))
+# ax.scatter3D(spline_gt[:,0], spline_gt[:,1], spline_gt[:,2])
+# ax.scatter3D(z[:,0], z[:,1], z[:,2])
+# ax.scatter3D(spline_opt[:,0], spline_opt[:,1], spline_opt[:,2])
+# plotPose3(ax,x1)
+# plotPose3(ax,x2)
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
