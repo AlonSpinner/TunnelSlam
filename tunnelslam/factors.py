@@ -1,6 +1,6 @@
 from symforce import geo
 from symforce import typing as T
-from symforce import sympy as sm
+from symforce import symbolic as sm
 import numpy as np
 
 def measurement_residual(

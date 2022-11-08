@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from symforce import geo
 from symforce import typing as T
 
-K = 1.5
-eps = 1e-6
+K = 10
+eps = 0.01
 lower_lim, upper_lim = 0.0, 1.0
 def boundry_factor(
     s : T.Scalar) -> geo.V1:

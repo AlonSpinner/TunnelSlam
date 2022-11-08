@@ -1,3 +1,6 @@
+import symforce
+symforce.set_epsilon_to_number()
+
 import numpy as np
 import matplotlib.pyplot as plt
 from tunnelslam.plotting import plotPose3
@@ -5,13 +8,10 @@ from tunnelslam.factors import cov2sqrtInfo, measurement_residual, odometry_resi
 import pickle
 import os
 
-import symforce
 from symforce import geo
 from symforce import logger
-from symforce import sympy as sm
+from symforce import symbolic as sm
 from symforce import typing as T
-if symforce.get_backend() != "symengine":
-    logger.warning("The 3D Localization example is very slow on the sympy backend")
 
 from symforce.opt.optimizer import Optimizer
 from symforce.values import Values
@@ -73,9 +73,8 @@ prior_cov = np.eye(6);  odom_cov[3,3] = 0.0001
 values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(odom_cov)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(meas_cov)))
 values["prior_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(prior_cov)))
-values["epsilon"] = sm.default_epsilon
+values["epsilon"] = sm.numeric_epsilon
 values["odom"] = meas_odom_hist
-
 da = [] #data assosication
 z = []
 for i, zi in enumerate(meas_lm_hist):

@@ -1,4 +1,7 @@
-from symforce import sympy as sm
+import symforce
+symforce.set_epsilon_to_number()
+
+from symforce import symbolic as sm
 from symforce import geo
 import numpy as np
 import matplotlib.pyplot as plt

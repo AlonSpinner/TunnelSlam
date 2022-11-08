@@ -1,20 +1,18 @@
-import re
+import symforce
+symforce.set_epsilon_to_number()
+
 from symforce import geo
 from symforce import typing as T
-from symforce import sympy as sm
+from symforce import symbolic as sm
 import numpy as np
 import matplotlib.pyplot as plt
 from tunnelslam.plotting import plotPose3
 
-import symforce
 from symforce import logger
-if symforce.get_backend() != "symengine":
-    logger.warning("The 3D Localization example is very slow on the sympy backend")
 
 from symforce.opt.optimizer import Optimizer
 from symforce.values import Values
 from symforce.opt.factor import Factor
-
 
 #Create data:
 
@@ -72,7 +70,7 @@ def measurement_residual(
     e = (z-splinePoint).norm()
     return sqrtInfo * e
 
-K = 20.0
+K = 10.0
 eps = 0.01
 lower_lim, upper_lim = 0.0, 1.0
 def boundry_factor(
