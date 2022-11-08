@@ -130,22 +130,23 @@ spline_opt = np.zeros((len(opt_s),3))
 for i, s in enumerate(opt_s):
     spline_opt[i] = f_spline(s)
 
-#plot 
-# fig = plt.figure()
-# ax = plt.axes(projection='3d',
-#         xlim = (-5,15), ylim = (-5,15), zlim = (-5,5),
-#         xlabel = 'x', ylabel = 'y', zlabel = 'z')
-# ax.set_box_aspect(aspect = (1,1,1))
-# ax.scatter3D(spline_gt[:,0], spline_gt[:,1], spline_gt[:,2])
-# ax.scatter3D(z[:,0], z[:,1], z[:,2])
-# ax.scatter3D(spline_opt[:,0], spline_opt[:,1], spline_opt[:,2])
-# plotPose3(ax,x1)
-# plotPose3(ax,x2)
+# plot 
+fig = plt.figure()
+ax = plt.axes(projection='3d',
+        xlim = (-5,15), ylim = (-5,15), zlim = (-5,5),
+        xlabel = 'x', ylabel = 'y', zlabel = 'z')
+ax.set_box_aspect(aspect = (1,1,1))
+ax.scatter3D(spline_gt[:,0], spline_gt[:,1], spline_gt[:,2])
+ax.scatter3D(z[:,0], z[:,1], z[:,2])
+ax.scatter3D(spline_opt[:,0], spline_opt[:,1], spline_opt[:,2])
+plotPose3(ax,x1)
+plotPose3(ax,x2)
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
 ax.plot(gt_s)
 ax.plot(opt_s)
-ax.legend(["s -  ground truth","s - optimized"])
+ax.plot(s_init)
+ax.legend(["s -  ground truth","s - optimized", "s - initial"])
 
 plt.show()
