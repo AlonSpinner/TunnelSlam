@@ -72,7 +72,7 @@ ODOM_COV[2,2] = (twist[2]/5 * DT)**2
 ODOM_COV[3,3] = (twist[3]/5 * DT)**2
 landmarks = np.array(history["gt_l"]).astype(float)
 #pass through tunnel - collect measurements
-for x in history["gt_x"]:
+for k, x in enumerate(history["gt_x"]):
         zk = []
         dak = []
         #measure landmarks
@@ -88,7 +88,7 @@ for x in history["gt_x"]:
                      and r <= SENSOR_RANGE:
                         z = np.random.multivariate_normal(np.array([r,theta,psi]),SENSOR_COV)
                         zk.append(z)
-                        dak.append(index)
+                        dak.append((k,index))
         zk = np.array(zk).astype(float)
         dak = np.array(dak).astype(int)
         history["z"].append(zk)
@@ -102,16 +102,52 @@ for x in history["gt_x"]:
 #-------------------------------------------------------------------------------------------
 values = Values()
 PRIOR_COV = np.eye(6) *1e-3
-#build values:
+
 values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(ODOM_COV)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(SENSOR_COV)))
 values["prior_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(PRIOR_COV)))
+values["epsilon"] = sm.numeric_epsilon
+
+values["u"] = []
+values["x"] = [x0]
+values["z"] = []
+values["da"] = []
+factors = []
+for i, (ui,zi,dai) in enumerate(zip(history["u"],history["z"],history["da"])):
+    k = i + 1
+
+    values["u"] += [ui]
+    values["x"] += [values["x"][-1].retract(ui)]
+    values["z"] += [zi]
+    values["da"] += [(i, dai)]
+
+    factors.append(
+        Factor(residual = odometry_residual,
+        keys = [
+                f"x[{k-1}]",
+                f"x[{k}]",
+                f"u[{k-1}]",
+                "odom_sqrtInfo",
+                "epsilon",
+        ]))
+    for j in range(len(dai)):
+        factors.append(
+                Factor(residual = measurement_residual,
+                keys = [
+                        f"x[{dai[j][0]}]",
+                        f"l[{dai[j][1]}]",
+                        f"z[{i}][{j}]",
+                        "meas_sqrtInfo",
+                ]))
+
+
+#build values:
+
 #initalize all variables !!
 
 history["dr_x"] = [x0]
 for noisy_u in history["u"]:
     history["dr_x"] += [history["dr_x"][-1].retract(noisy_u)]
-
 
 values["x"] = history["dr_x"]
 values["z"] = history["z"]
