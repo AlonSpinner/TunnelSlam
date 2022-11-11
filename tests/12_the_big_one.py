@@ -22,10 +22,10 @@ T_final = 75.0
 
 R0 = geo.Rot3.from_yaw_pitch_roll(0,np.radians(10),0)
 t0 = geo.V3()
-x0 = geo.Pose3(R = R0, t = t0)
+X0 = geo.Pose3(R = R0, t = t0)
 
 w_world = geo.V3([0.0,0.0,2 * np.pi/15]) #15 seconds for a full rotation
-w_robot = x0.inverse() * w_world
+w_robot = X0.inverse() * w_world
 v_robot = geo.V3([-3.0,0.0,0.0])
 
 twist = geo.V6()
@@ -35,14 +35,15 @@ twist = np.array(twist,dtype = float)
 #-------------------------------------------------------------------------------------------
 #-------------------------build tunnel and extract ground truth key poses and data --------
 #-------------------------------------------------------------------------------------------
-history = {"gt_x": [x0],
+history = {"gt_x": [X0],
            "gt_l": [],
             "z" : [],
             "da" : [],
             "u" : []}
 time_from_last_keypose = 0.0
 DT_TUNNELING = DT/3 
-x = x0
+x = X0
+#build tunnel
 for t in np.arange(0,T_final,DT_TUNNELING):
     #move robot
     x = x * geo.Pose3.from_tangent(twist * DT_TUNNELING)
@@ -65,7 +66,7 @@ for t in np.arange(0,T_final,DT_TUNNELING):
 SENSOR_RANGE = 20.0
 SENSOR_FOV_Y = np.radians(30)
 SENSOR_FOV_X = np.radians(50)
-SENSOR_COV = np.diag([4.0,np.radians(3),np.radians(3)])
+SENSOR_COV = np.diag([2.0,np.radians(3),np.radians(3)])
 ODOM_COV = 1e-3 * np.eye(6) #in [rad,rad,rad,m,m,m]**2
 ODOM_COV[0,0] = (twist[0]/3 * DT)**2
 ODOM_COV[2,2] = (twist[2]/3 * DT)**2
@@ -90,10 +91,8 @@ for k, x in enumerate(history["gt_x"]):
                     z = np.random.multivariate_normal(np.array([r,theta,psi]),SENSOR_COV)
                     zk.append(z)
                     dak.append((k,index))
-    zk = np.array(zk).astype(float)
-    dak = np.array(dak).astype(int)
-    history["z"] += [[zkj for zkj in zk]]
-    history["da"] += [[dakj for dakj in dak]]
+    history["z"] += [zk]
+    history["da"] += [dak]
 
     noisy_u = np.random.multivariate_normal(twist * DT,ODOM_COV)
     history["u"] += [noisy_u]
@@ -102,7 +101,7 @@ for k, x in enumerate(history["gt_x"]):
 #------------------------------------ DEAD RECKONING ---------------------------------------
 #-------------------------------------------------------------------------------------------
 estimation = {}
-estimation["dr_x"] = [x0]
+estimation["dr_x"] = [X0]
 
 #dead reckoning for initial estimation of [x]
 for k, uk in enumerate(history["u"]):
@@ -164,8 +163,21 @@ for k in range(len(values["u"])):
             "epsilon",
     ]))
 
+#measurements
+for i, dai in enumerate(values["da"]):
+        for j in range(len(dai)):
+                factors.append(
+                        Factor(residual = measurement_residual,
+                        keys = [
+                                f"x[{dai[j][0]}]",
+                                f"l[{dai[j][1]}]",
+                                f"z[{i}][{j}]",
+                                "meas_sqrtInfo",
+                        ]))
+
 optimized_keys_x = [f"x[{k}]" for k in range(len(values["x"]))]
-optimized_keys = optimized_keys_x
+optimized_keys_l = [f"l[{k}]" for k in range(len(values["l"])) if values["l"][k] != False]
+optimized_keys = optimized_keys_x + optimized_keys_l
 
 optimizer = Optimizer(
 factors=factors,
@@ -187,10 +199,14 @@ ax = plt.axes(projection='3d', aspect='equal',
         xlim = (-10,10), ylim = (-15,5), zlim = (0,40),
         xlabel = 'x', ylabel = 'y', zlabel = 'z')
 plotting.axis_equal(ax)
+#plot trajectory
 for x in history["gt_x"]:
-    plotting.plotPose3(ax,x)
+    plotting.plotPose3(ax,x, color = "red")
 for x in estimation["dr_x"]:
     plotting.plotPose3(ax,x,color = "green")
+for x in optVals["x"]:
+    plotting.plotPose3(ax,x,color = "orange")
+#plot landmarks
 gt_landmarks = np.array(history["gt_l"]).astype(float)
 ax.scatter(gt_landmarks[:,0], gt_landmarks[:,1], gt_landmarks[:,2])
 

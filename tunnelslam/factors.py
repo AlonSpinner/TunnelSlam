@@ -112,4 +112,4 @@ def radial_residual2(
     return geo.V1(e)
 
 def cov2sqrtInfo(M : np.ndarray) -> np.ndarray:
-    return np.linalg.cholesky(M).T
+    return np.linalg.cholesky(np.linalg.inv(M)).T
