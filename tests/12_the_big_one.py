@@ -9,7 +9,7 @@ import tunnelslam.plotting as plotting
 from symforce.opt.optimizer import Optimizer
 from symforce.values import Values
 from symforce.opt.factor import Factor
-from tunnelslam.factors import cov2sqrtInfo, measurement_residual, odometry_residual, pose3prior_residual
+from tunnelslam.factors import cov2sqrtInfo, measurement_residual, odometry_residual_tangent, pose3prior_residual
 from tunnelslam.utils import spherical_to_cartesian
 
 #-------------------------------------------------------------------------------------------
@@ -144,26 +144,28 @@ values["l"] = estimation["dr_l"]
 
 factors = []
 #prior
-factors.append(
-        Factor(residual = pose3prior_residual,
-        keys = [
-                f"x[0]",
-                "x0",
-                "prior_sqrtInfo",
-                "epsilon"
-        ]))
+# factors.append(
+#         Factor(residual = pose3prior_residual,
+#         keys = [
+#                 f"x[0]",
+#                 "x0",
+#                 "prior_sqrtInfo",
+#                 "epsilon"
+#         ]))
 #odometry
 for k in range(len(history["u"])):
-    if k == 0: continue
     factors.append(
-    Factor(residual = odometry_residual,
+    Factor(residual = odometry_residual_tangent,
     keys = [
-            f"x[{k-1}]",
             f"x[{k}]",
-            f"odom[{k-1}]",
+            f"x[{k+1}]",
+            f"u[{k}]",
             "odom_sqrtInfo",
             "epsilon",
     ]))
+
+k=10
+odometry_residual_tangent(values["x"][k-1],values["x"][k],values["u"][k],values["odom_sqrtInfo"],values["epsilon"])
 
 N_poses = len(history["u"]) + 1
 optimized_keys_x = [f"x[{k}]" for k in range(N_poses)]
