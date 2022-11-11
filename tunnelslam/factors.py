@@ -48,28 +48,6 @@ def odometry_residual(
     tangent_error = predict.local_coordinates(odom, epsilon = epsilon)
     return geo.M.diag(sqrtInfo) * geo.V6(tangent_error)
 
-def odometry_residual_tangent(
-    x1: geo.Pose3,
-    x2: geo.Pose3,
-    u: geo.V6,
-    sqrtInfo: geo.V6, #diagonal of sqrt information matrix
-    epsilon: T.Scalar,
-) -> geo.V6:
-    """
-    Residual on the relative pose between two timesteps of the robot.
-
-    Args:
-        x1: First pose
-        x2: Second pose
-        odom: Relative pose measurement between the poses
-        sqrtInfo: Sqrt information matrix
-        epsilon: Small number for singularity handling
-    """
-    predict = x1.retract(u, epsilon = epsilon)
-    tangent_error = predict.local_coordinates(x2, epsilon = epsilon)
-    return geo.M.diag(sqrtInfo) * geo.V6(tangent_error)
-
-
 def pose3prior_residual(
     x : geo.Pose3, 
     x0: geo.Pose3, 

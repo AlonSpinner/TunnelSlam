@@ -9,7 +9,7 @@ import tunnelslam.plotting as plotting
 from symforce.opt.optimizer import Optimizer
 from symforce.values import Values
 from symforce.opt.factor import Factor
-from tunnelslam.factors import cov2sqrtInfo, measurement_residual, odometry_residual_tangent, pose3prior_residual
+from tunnelslam.factors import cov2sqrtInfo, measurement_residual, odometry_residual, pose3prior_residual
 from tunnelslam.utils import spherical_to_cartesian
 
 #-------------------------------------------------------------------------------------------
@@ -22,7 +22,7 @@ T_final = 75.0
 
 R0 = geo.Rot3.from_yaw_pitch_roll(0,np.radians(10),0)
 t0 = geo.V3()
-x0 = geo.Pose3_SE3(R = R0, t = t0)
+x0 = geo.Pose3(R = R0, t = t0)
 
 w_world = geo.V3([0.0,0.0,2 * np.pi/15]) #15 seconds for a full rotation
 w_robot = x0.inverse() * w_world
@@ -45,15 +45,14 @@ DT_TUNNELING = DT/3
 x = x0
 for t in np.arange(0,T_final,DT_TUNNELING):
     #move robot
-    # x = x * geo.Pose3_SE3.from_tangent(twist * DT_TUNNELING)
-    x = x.retract(twist * DT_TUNNELING)
+    x = x * geo.Pose3.from_tangent(twist * DT_TUNNELING)
 
     #perturb pose only on roll
     tangent_perturbation = np.zeros(6); 
     tangent_perturbation[0] = np.random.uniform(-np.pi,+np.pi)
-    p_perturb = x.retract(tangent_perturbation)
+    x_perturb = x * geo.Pose3.from_tangent(tangent_perturbation)
     #calculate landmark in world coordinates
-    lm = p_perturb * geo.Vector3(np.array([0,TUNNEL_RADIUS,0]))        
+    lm = x_perturb * geo.Vector3(np.array([0,TUNNEL_RADIUS,0]))        
     
     #store
     history["gt_l"].append(lm)
@@ -72,31 +71,32 @@ ODOM_COV[0,0] = (twist[0]/3 * DT)**2
 ODOM_COV[2,2] = (twist[2]/3 * DT)**2
 ODOM_COV[3,3] = (twist[3]/3 * DT)**2
 landmarks = np.array(history["gt_l"]).astype(float)
-#pass through tunnel - collect measurements
+#pass through tunnel - collect measurements. 
 for k, x in enumerate(history["gt_x"]):
-        zk = []
-        dak = []
-        #measure landmarks
-        for index,lm in enumerate(landmarks):
-                #z  = [r,yaw,pitch] ~ [r,theta,psi]
-                rel_lm = x.inverse() * geo.V3(lm)
-                r = float(rel_lm.norm())
-                theta = float(sm.atan2(rel_lm[1],rel_lm[0])) #yaw #arctan2(y,x)
-                psi = float(sm.atan2(rel_lm[2],geo.V2(rel_lm[:2]).norm()))#pitch
+    if k == 0: continue
+    zk = []
+    dak = []
+    #measure landmarks
+    for index,lm in enumerate(landmarks):
+            #z  = [r,yaw,pitch] ~ [r,theta,psi]
+            rel_lm = x.inverse() * geo.V3(lm)
+            r = float(rel_lm.norm())
+            theta = float(sm.atan2(rel_lm[1],rel_lm[0])) #yaw #arctan2(y,x)
+            psi = float(sm.atan2(rel_lm[2],geo.V2(rel_lm[:2]).norm()))#pitch
 
-                if abs(theta) <= SENSOR_FOV_X \
-                    and abs(psi) <= SENSOR_FOV_Y \
-                     and r <= SENSOR_RANGE:
-                        z = np.random.multivariate_normal(np.array([r,theta,psi]),SENSOR_COV)
-                        zk.append(z)
-                        dak.append((k,index))
-        zk = np.array(zk).astype(float)
-        dak = np.array(dak).astype(int)
-        history["z"].append(zk)
-        history["da"].append(dak)
+            if abs(theta) <= SENSOR_FOV_X \
+                and abs(psi) <= SENSOR_FOV_Y \
+                    and r <= SENSOR_RANGE:
+                    z = np.random.multivariate_normal(np.array([r,theta,psi]),SENSOR_COV)
+                    zk.append(z)
+                    dak.append((k,index))
+    zk = np.array(zk).astype(float)
+    dak = np.array(dak).astype(int)
+    history["z"] += [[zkj for zkj in zk]]
+    history["da"] += [[dakj for dakj in dak]]
 
-        noisy_u = np.random.multivariate_normal(twist * DT,ODOM_COV)
-        history["u"].append(noisy_u)
+    noisy_u = np.random.multivariate_normal(twist * DT,ODOM_COV)
+    history["u"] += [noisy_u]
 
 #-------------------------------------------------------------------------------------------
 #------------------------------------ DEAD RECKONING ---------------------------------------
@@ -106,13 +106,13 @@ estimation["dr_x"] = [x0]
 
 #dead reckoning for initial estimation of [x]
 for k, uk in enumerate(history["u"]):
-    estimation["dr_x"] += [estimation["dr_x"][-1].retract(uk)]
+    estimation["dr_x"] += [estimation["dr_x"][-1] * geo.Pose3.from_tangent(uk)]
 
 #dead reckoning for landmarks from first sighting projection, using dr_x
 N_landmarks = 0
 for dak in history["da"]:
-    if dak.size == 0: continue
-    N_landmarks = max(N_landmarks, max(dak[:,1]))
+    if len(dak) == 0: continue
+    N_landmarks = max(N_landmarks, np.max(np.array(dak)[:,1]))
 N_landmarks +=1 #dak measures indicies
 estimation["dr_l"] = [False for _ in range(N_landmarks)] #initalizes with falses
 for k, dr_x in enumerate(estimation["dr_x"]):
@@ -120,10 +120,10 @@ for k, dr_x in enumerate(estimation["dr_x"]):
     i = k-1 #from x[1] we measure z[0]
     dak = history["da"][i]
     zk = history["z"][i]
-    if dak.size == 0: continue
-    for i, j in enumerate(dak[:,1]):
-        if estimation["dr_l"][j] == False:
-            estimation["dr_l"][j] = dr_x * geo.V3(spherical_to_cartesian(zk[i]))
+    if len(dak) == 0: continue
+    for i, d in enumerate(dak):
+        if estimation["dr_l"][d[1]] == False:
+            estimation["dr_l"][d[1]] = dr_x * geo.V3(spherical_to_cartesian(zk[i]))
 
 #-------------------------------------------------------------------------------------------
 #------------------------------------ SLAM OPTIMIZATION ------------------------------------
@@ -135,7 +135,7 @@ values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(ODOM_COV)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(SENSOR_COV)))
 values["prior_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(PRIOR_COV)))
 values["epsilon"] = sm.numeric_epsilon
-values["u"] = history["u"]
+values["u"] = [geo.Pose3.from_tangent(uk) for uk in history["u"]]
 values["z"] = history["z"]
 values["da"] = history["da"]
 values["x0"] = estimation["dr_x"][0]
@@ -143,19 +143,19 @@ values["x"] = estimation["dr_x"] #initalized from dead reckoning
 values["l"] = estimation["dr_l"]
 
 factors = []
-#prior
-# factors.append(
-#         Factor(residual = pose3prior_residual,
-#         keys = [
-#                 f"x[0]",
-#                 "x0",
-#                 "prior_sqrtInfo",
-#                 "epsilon"
-#         ]))
-#odometry
-for k in range(len(history["u"])):
+# prior
+factors.append(
+        Factor(residual = pose3prior_residual,
+        keys = [
+                f"x[0]",
+                "x0",
+                "prior_sqrtInfo",
+                "epsilon"
+        ]))
+# odometry
+for k in range(len(values["u"])):
     factors.append(
-    Factor(residual = odometry_residual_tangent,
+    Factor(residual = odometry_residual,
     keys = [
             f"x[{k}]",
             f"x[{k+1}]",
@@ -164,11 +164,7 @@ for k in range(len(history["u"])):
             "epsilon",
     ]))
 
-k=10
-odometry_residual_tangent(values["x"][k-1],values["x"][k],values["u"][k],values["odom_sqrtInfo"],values["epsilon"])
-
-N_poses = len(history["u"]) + 1
-optimized_keys_x = [f"x[{k}]" for k in range(N_poses)]
+optimized_keys_x = [f"x[{k}]" for k in range(len(values["x"]))]
 optimized_keys = optimized_keys_x
 
 optimizer = Optimizer(
@@ -177,7 +173,7 @@ optimized_keys=optimized_keys,
 # Return problem stats for every iteration
 debug_stats=True,
 # Customize optimizer behavior
-params=Optimizer.Params(verbose=True, enable_bold_updates = False)
+params=Optimizer.Params(verbose=False, enable_bold_updates = False)
 )
 result = optimizer.optimize(values)
 
