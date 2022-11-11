@@ -16,10 +16,12 @@ from tunnelslam.utils import spherical_to_cartesian
 #-------------------------------------------------------------------------------------------
 #-------------------------------- PROBLEM PARAMETERS ---------------------------------------
 #-------------------------------------------------------------------------------------------
+np.random.seed(8)
 
-TUNNEL_RADIUS = 1.0
+
+TUNNEL_RADIUS = 3.0
 DT = 1.0 #constant time between keyframes
-T_final = 75.0
+T_final = 30.0
 
 R0 = geo.Rot3.from_yaw_pitch_roll(0,np.radians(10),0)
 t0 = geo.V3()
@@ -32,7 +34,7 @@ v_robot = geo.V3([-3.0,0.0,0.0])
 twist = geo.V6()
 twist[:3] = w_robot
 twist[3:] = v_robot
-twist = np.array(twist,dtype = float)
+TWIST = np.array(twist,dtype = float)
 #-------------------------------------------------------------------------------------------
 #-------------------------build tunnel and extract ground truth key poses and data --------
 #-------------------------------------------------------------------------------------------
@@ -41,37 +43,41 @@ history = {"gt_x": [X0],
             "z" : [],
             "da" : [],
             "u" : []}
-time_from_last_keypose = 0.0
-DT_TUNNELING = DT/3
 x = X0
-#build tunnel
-for t in np.arange(0,T_final,DT_TUNNELING):
-    #move robot
-    x = x * geo.Pose3.from_tangent(twist * DT_TUNNELING)
-
+for _ in range(4):
     #perturb pose only on roll
     tangent_perturbation = np.zeros(6); 
     tangent_perturbation[0] = np.random.uniform(-np.pi,+np.pi)
     x_perturb = x * geo.Pose3.from_tangent(tangent_perturbation)
     #calculate landmark in world coordinates
     lm = x_perturb * geo.Vector3(np.array([0,TUNNEL_RADIUS,0]))        
-    
     #store
     history["gt_l"].append(lm)
-    if time_from_last_keypose >= DT:
-        history["gt_x"].append(x)
-        time_from_last_keypose = 0.0
-    else:
-        time_from_last_keypose += DT_TUNNELING
+#build tunnel
+for t in np.arange(0,T_final,DT):
+    #move robot
+    x = x * geo.Pose3.from_tangent(TWIST * DT)
+
+    for _ in range(4):
+        #perturb pose only on roll
+        tangent_perturbation = np.zeros(6); 
+        tangent_perturbation[0] = np.random.uniform(-np.pi,+np.pi)
+        x_perturb = x * geo.Pose3.from_tangent(tangent_perturbation)
+        #calculate landmark in world coordinates
+        lm = x_perturb * geo.Vector3(np.array([0,TUNNEL_RADIUS,0]))        
+        #store
+        history["gt_l"].append(lm)
+
+    history["gt_x"].append(x)
 
 SENSOR_RANGE = 20.0
 SENSOR_FOV_Y = np.radians(30)
 SENSOR_FOV_X = np.radians(50)
-SENSOR_COV = np.diag([2.0,np.radians(3),np.radians(3)])
-ODOM_COV = 1e-3 * np.eye(6) #in [rad,rad,rad,m,m,m]**2
-ODOM_COV[0,0] = (twist[0]/4 * DT)**2
-ODOM_COV[2,2] = (twist[2]/4 * DT)**2
-ODOM_COV[3,3] = (twist[3]/4 * DT)**2
+SENSOR_COV = np.diag([0.1,np.radians(1),np.radians(1)])
+ODOM_COV = 1e-15 * np.eye(6) #in [rad,rad,rad,m,m,m]**2
+ODOM_COV[0,0] = (twist[0]/3 * DT)**2
+ODOM_COV[2,2] = (twist[2]/3* DT)**2
+ODOM_COV[3,3] = (twist[3]/3 * DT)**2
 landmarks = np.array(history["gt_l"]).astype(float)
 #pass through tunnel - collect measurements. 
 for k, x in enumerate(history["gt_x"]):
@@ -95,7 +101,7 @@ for k, x in enumerate(history["gt_x"]):
     history["z"] += [zk]
     history["da"] += [dak]
 
-    noisy_u = np.random.multivariate_normal(twist * DT,ODOM_COV)
+    noisy_u = np.random.multivariate_normal(TWIST * DT,ODOM_COV)
     history["u"] += [noisy_u]
 
 #-------------------------------------------------------------------------------------------
@@ -124,14 +130,16 @@ for k, dr_x in enumerate(estimation["dr_x"]):
     for i, d in enumerate(dak):
         if estimation["dr_l"][d[1]] == False:
             estimation["dr_l"][d[1]] = dr_x * geo.V3(spherical_to_cartesian(zk[i]))
-
+for k, l in enumerate(estimation["dr_l"]):
+    if l == False: #wont participate in the optimization, but need to throw some value in there
+        estimation["dr_l"][k] = geo.V3([0,0,0])
 #-------------------------------------------------------------------------------------------
 #--------------------------------REGULAR SLAM OPTIMIZATION ---------------------------------
 #-------------------------------------------------------------------------------------------
         
 values = Values()
-PRIOR_COV = np.eye(6) *1e-3
-values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(ODOM_COV)))
+PRIOR_COV = np.eye(6) *1e-15
+values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(ODOM_COV*1e15)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(SENSOR_COV)))
 values["prior_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(PRIOR_COV)))
 values["epsilon"] = sm.numeric_epsilon
@@ -186,13 +194,13 @@ optimized_keys=optimized_keys,
 # Return problem stats for every iteration
 debug_stats=True,
 # Customize optimizer behavior
-params=Optimizer.Params(verbose=False, enable_bold_updates = False)
+params=Optimizer.Params(verbose=False, enable_bold_updates = True)
 )
 result = optimizer.optimize(values)
 optVals_slam = result.optimized_values
 
 #-------------------------------------------------------------------------------------------
-#--------------------------------ADDING MY FACTORS SLAM OPTIMIZATION ----------------------
+#--------------------------------ADDING MY FACTORS FOR TUNNELSLAM --------------------------
 #-------------------------------------------------------------------------------------------
 
 #ferguson factors
@@ -214,6 +222,10 @@ for i in range(len(values["l"])):
             if d < back_dist:
                 back_dist = d
                 back_index = k
+    if back_index == -1: #stupid shit...
+        back_index = front_index
+    if front_index == -1:
+        front_index = back_index
     #initalize s
     values["s"][i] = front_dist / (front_dist + back_dist)
     #add factor
@@ -250,9 +262,9 @@ optimizer = Optimizer(
 factors=factors,
 optimized_keys=optimized_keys,
 # Return problem stats for every iteration
-debug_stats=True,
+debug_stats=False,
 # Customize optimizer behavior
-params=Optimizer.Params(verbose=False, enable_bold_updates = False)
+params=Optimizer.Params(verbose=False, enable_bold_updates = True)
 )
 result = optimizer.optimize(values)
 optVals_tunnelslam = result.optimized_values
@@ -267,7 +279,7 @@ ax = plt.axes(projection='3d', aspect='equal',
 plotting.axis_equal(ax)
 #plot trajectory
 for x in history["gt_x"]:
-    plotting.plotPose3(ax,x, color = "red")
+    plotting.plotPose3(ax,x, color = "black")
 for x in estimation["dr_x"]:
     plotting.plotPose3(ax,x,color = "green")
 for x in optVals_slam["x"]:
@@ -275,16 +287,20 @@ for x in optVals_slam["x"]:
 for x in optVals_tunnelslam["x"]:
     plotting.plotPose3(ax,x,color = "blue")
 #plot landmarks
-gt_landmarks = np.array(history["gt_l"]).astype(float)
-ax.scatter(gt_landmarks[:,0], gt_landmarks[:,1], gt_landmarks[:,2])
+# gt_landmarks = np.array(history["gt_l"]).astype(float)
+# ax.scatter(gt_landmarks[:,0], gt_landmarks[:,1], gt_landmarks[:,2], c= "black", marker = "d")
+# dr_landmarks = np.array(estimation["dr_l"],dtype = float)
+# ax.scatter(dr_landmarks[:,0], dr_landmarks[:,1], dr_landmarks[:,2],c = 'gray', marker = 'x')
+# slam_landmarks = np.array(optVals_slam["l"],dtype = float)
+# ax.scatter(slam_landmarks[:,0], slam_landmarks[:,1], slam_landmarks[:,2],c = 'orange', marker = 'd',alpha = 0.5)
+# tunnelslam_landmarks = np.array(optVals_tunnelslam["l"],dtype = float)
+# ax.scatter(tunnelslam_landmarks[:,0], tunnelslam_landmarks[:,1], tunnelslam_landmarks[:,2],c = 'blue', marker = 'd')
 
-dr_landmarks = np.array(estimation["dr_l"],dtype = float)
-ax.scatter(dr_landmarks[:,0], dr_landmarks[:,1], dr_landmarks[:,2],c = 'gray', marker = 'x')
-
-for i, da in enumerate(history["da"]):
-    for j, d in enumerate(da):
-        x = np.array(history["gt_x"][i].t)
-        l = np.array(history["gt_l"][d[1]])
-        ax.plot([x[0],l[0]],[x[1],l[1]],[x[2],l[2]],
-                color = 'k', linewidth = 0.5, linestyle = '-')
+#plotting data assoiscations between gt landmarks and poses
+for da in history["da"]:
+        for j, d in enumerate(da):
+            x = np.array(history["gt_x"][d[0]].t)
+            l = np.array(history["gt_l"][d[1]])
+            ax.plot([x[0],l[0]],[x[1],l[1]],[x[2],l[2]],
+                    color = 'k', linewidth = 0.5, linestyle = '-', alpha = 0.2)
 plt.show()
