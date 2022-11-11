@@ -66,6 +66,50 @@ def pose3prior_residual(
     tangent_error = predict.to_tangent(epsilon = epsilon)
     return geo.M.diag(sqrtInfo) * geo.V6(tangent_error)
 
+def ferguson_residual(
+    s : T.Scalar,
+    x1 : geo.Pose3,
+    x2 : geo.Pose3,
+    l : geo.V3,
+    d : T.Scalar,
+    DT : T.Scalar
+    ):
+    """
+    Residual on the relative pose between two timesteps of the robot.
+
+    Args:
+        x1: First pose
+        x2: Second pose
+        odom: Relative pose measurement between the poses
+        sqrtInfo: Sqrt information matrix
+        epsilon: Small number for singularity handling
+    """
+    twist = geo.V6((x1.inverse() * x2).to_tangent())/DT
+    m0 = twist[3:,0]
+    m1 = m0 #assume constant velocity
+
+    splinePoint = (2*s**3-3*s**2+1) * x1.t \
+        + (s**3 - 2*s**2 + s) * m0 \
+        + (-2*s**3 + 3*s**2) * x2.t \
+        + (s**3 - s**2) * m1
+
+    d_predict = (splinePoint - l).norm()
+    e = geo.V1((d - d_predict)**2)
+    return e
+
+def boundry_factor(
+    s : T.Scalar,
+    lower_lim : T.Scalar,
+    upper_lim : T.Scalar,
+    eps : T.Scalar,
+    k : T.Scalar):
+    if s < lower_lim + eps:
+        return geo.V1(k * abs(s - lower_lim))
+    elif s > upper_lim - eps:
+        return geo.V1(k * abs(s - upper_lim))
+    else:
+        return geo.V1(0.0)
+
 def radial_residual(
     x: geo.Pose3, 
     lm: geo.V3, 
@@ -77,38 +121,6 @@ def radial_residual(
     """
     rel_lm = x.inverse() * lm
     e = geo.V2(rel_lm[1:]).norm() - r
-    return geo.V1(e)
-
-def radial_residual2(
-    s : T.Scalar,
-    x1 : geo.Pose3,
-    x2 : geo.Pose3,
-    lm : geo.V3,
-    r : T.Scalar,
-    d : T.Scalar
-    ):
-    """
-    s - running parameter s in [0,1] .. how do we constrain?
-    x1 - pose at s = 0
-    x2 - pose at s = 1
-    lm - landmark
-    r - tunnel radius
-    d - 1 if this factor is relevant, 0 otherwise (that is, if lm is attached to this spline)
-    """
-    #lets assume m derivatives were calculated for now...
-    p0 = x1.t
-    m0 = x1.R.to_rotation_matrix()[:,0]
-    p1 = x2.t
-    m1 = x2.R.to_rotation_matrix()[:,0]
-
-    #lets create a curve with some running parameter u
-    splinePoint = (2*s**3-3*s**2+1) * p0 \
-            + (s**3 - 2*s**2 + s) * m0 \
-            + (-2*s**3 + 3*s**2) * p1 \
-            + (s**3 - s**2) * m1
-
-    rhat = (lm-splinePoint).norm()
-    e = (rhat - r) * d
     return geo.V1(e)
 
 def cov2sqrtInfo(M : np.ndarray) -> np.ndarray:
