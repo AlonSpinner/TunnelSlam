@@ -10,6 +10,7 @@ from symforce.opt.optimizer import Optimizer
 from symforce.values import Values
 from symforce.opt.factor import Factor
 from tunnelslam.factors import cov2sqrtInfo, measurement_residual, odometry_residual, pose3prior_residual
+from tunnelslam.utils import spherical_to_cartesian
 
 #-------------------------------------------------------------------------------------------
 #-------------------------------- PROBLEM PARAMETERS ---------------------------------------
@@ -32,7 +33,7 @@ twist[:3] = w_robot
 twist[3:] = v_robot
 twist = np.array(twist,dtype = float)
 #-------------------------------------------------------------------------------------------
-#-------------------------build tunnel and extract ground truth key poses -------------------
+#-------------------------build tunnel and extract ground truth key poses and data --------
 #-------------------------------------------------------------------------------------------
 history = {"gt_x": [x0],
            "gt_l": [],
@@ -65,11 +66,11 @@ for t in np.arange(0,T_final,DT_TUNNELING):
 SENSOR_RANGE = 20.0
 SENSOR_FOV_Y = np.radians(30)
 SENSOR_FOV_X = np.radians(50)
-SENSOR_COV = np.diag([0.1,np.radians(1),np.radians(1)])
+SENSOR_COV = np.diag([4.0,np.radians(3),np.radians(3)])
 ODOM_COV = 1e-3 * np.eye(6) #in [rad,rad,rad,m,m,m]**2
-ODOM_COV[0,0] = (twist[0]/5 * DT)**2
-ODOM_COV[2,2] = (twist[2]/5 * DT)**2
-ODOM_COV[3,3] = (twist[3]/5 * DT)**2
+ODOM_COV[0,0] = (twist[0]/3 * DT)**2
+ODOM_COV[2,2] = (twist[2]/3 * DT)**2
+ODOM_COV[3,3] = (twist[3]/3 * DT)**2
 landmarks = np.array(history["gt_l"]).astype(float)
 #pass through tunnel - collect measurements
 for k, x in enumerate(history["gt_x"]):
@@ -98,61 +99,48 @@ for k, x in enumerate(history["gt_x"]):
         history["u"].append(noisy_u)
 
 #-------------------------------------------------------------------------------------------
-#------------------------------------ SOLVE SLAM -------------------------------------------
+#------------------------------------ DEAD RECKONING ---------------------------------------
 #-------------------------------------------------------------------------------------------
+estimation = {}
+estimation["dr_x"] = [x0]
+
+#dead reckoning for initial estimation of [x]
+for k, uk in enumerate(history["u"]):
+    estimation["dr_x"] += [estimation["dr_x"][-1].retract(uk)]
+
+#dead reckoning for landmarks from first sighting projection, using dr_x
+N_landmarks = 0
+for dak in history["da"]:
+    if dak.size == 0: continue
+    N_landmarks = max(N_landmarks, max(dak[:,1]))
+N_landmarks +=1 #dak measures indicies
+estimation["dr_l"] = [False for _ in range(N_landmarks)] #initalizes with falses
+for k, dr_x in enumerate(estimation["dr_x"]):
+    if k == 0: continue
+    i = k-1 #from x[1] we measure z[0]
+    dak = history["da"][i]
+    zk = history["z"][i]
+    if dak.size == 0: continue
+    for i, j in enumerate(dak[:,1]):
+        if estimation["dr_l"][j] == False:
+            estimation["dr_l"][j] = dr_x * geo.V3(spherical_to_cartesian(zk[i]))
+
+#-------------------------------------------------------------------------------------------
+#------------------------------------ SLAM OPTIMIZATION ------------------------------------
+#-------------------------------------------------------------------------------------------
+        
 values = Values()
 PRIOR_COV = np.eye(6) *1e-3
-
 values["odom_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(ODOM_COV)))
 values["meas_sqrtInfo"] = geo.V3(np.diag(cov2sqrtInfo(SENSOR_COV)))
 values["prior_sqrtInfo"] = geo.V6(np.diag(cov2sqrtInfo(PRIOR_COV)))
 values["epsilon"] = sm.numeric_epsilon
-
-values["u"] = []
-values["x"] = [x0]
-values["z"] = []
-values["da"] = []
-factors = []
-for i, (ui,zi,dai) in enumerate(zip(history["u"],history["z"],history["da"])):
-    k = i + 1
-
-    values["u"] += [ui]
-    values["x"] += [values["x"][-1].retract(ui)]
-    values["z"] += [zi]
-    values["da"] += [(i, dai)]
-
-    factors.append(
-        Factor(residual = odometry_residual,
-        keys = [
-                f"x[{k-1}]",
-                f"x[{k}]",
-                f"u[{k-1}]",
-                "odom_sqrtInfo",
-                "epsilon",
-        ]))
-    for j in range(len(dai)):
-        factors.append(
-                Factor(residual = measurement_residual,
-                keys = [
-                        f"x[{dai[j][0]}]",
-                        f"l[{dai[j][1]}]",
-                        f"z[{i}][{j}]",
-                        "meas_sqrtInfo",
-                ]))
-
-
-#build values:
-
-#initalize all variables !!
-
-history["dr_x"] = [x0]
-for noisy_u in history["u"]:
-    history["dr_x"] += [history["dr_x"][-1].retract(noisy_u)]
-
-values["x"] = history["dr_x"]
+values["u"] = history["u"]
 values["z"] = history["z"]
-# values["l"]
-# values["s"]
+values["da"] = history["da"]
+values["x0"] = estimation["dr_x"][0]
+values["x"] = estimation["dr_x"] #initalized from dead reckoning
+values["l"] = estimation["dr_l"]
 
 factors = []
 #prior
@@ -164,7 +152,34 @@ factors.append(
                 "prior_sqrtInfo",
                 "epsilon"
         ]))
+#odometry
+for k in range(len(history["u"])):
+    if k == 0: continue
+    factors.append(
+    Factor(residual = odometry_residual,
+    keys = [
+            f"x[{k-1}]",
+            f"x[{k}]",
+            f"odom[{k-1}]",
+            "odom_sqrtInfo",
+            "epsilon",
+    ]))
 
+N_poses = len(history["u"]) + 1
+optimized_keys_x = [f"x[{k}]" for k in range(N_poses)]
+optimized_keys = optimized_keys_x
+
+optimizer = Optimizer(
+factors=factors,
+optimized_keys=optimized_keys,
+# Return problem stats for every iteration
+debug_stats=True,
+# Customize optimizer behavior
+params=Optimizer.Params(verbose=True, enable_bold_updates = False)
+)
+result = optimizer.optimize(values)
+
+optVals = result.optimized_values
 #-------------------------------------------------------------------------------------------
 #----------------------------------------PLOT-----------------------------------------------
 #-------------------------------------------------------------------------------------------
@@ -176,14 +191,18 @@ ax = plt.axes(projection='3d', aspect='equal',
 plotting.axis_equal(ax)
 for x in history["gt_x"]:
     plotting.plotPose3(ax,x)
-for x in history["dr_x"]:
+for x in estimation["dr_x"]:
     plotting.plotPose3(ax,x,color = "green")
 gt_landmarks = np.array(history["gt_l"]).astype(float)
 ax.scatter(gt_landmarks[:,0], gt_landmarks[:,1], gt_landmarks[:,2])
+
+dr_landmarks = np.array(estimation["dr_l"],dtype = float)
+ax.scatter(dr_landmarks[:,0], dr_landmarks[:,1], dr_landmarks[:,2],c = 'gray', marker = 'x')
+
 for i, da in enumerate(history["da"]):
     for j, d in enumerate(da):
-        ax.plot([history["gt_x"][i].t[0],gt_landmarks[d,0]],
-                [history["gt_x"][i].t[1],gt_landmarks[d,1]],
-                [history["gt_x"][i].t[2],gt_landmarks[d,2]],
+        x = np.array(history["gt_x"][i].t)
+        l = np.array(history["gt_l"][d[1]])
+        ax.plot([x[0],l[0]],[x[1],l[1]],[x[2],l[2]],
                 color = 'k', linewidth = 0.5, linestyle = '-')
 plt.show()
