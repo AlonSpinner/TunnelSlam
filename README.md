@@ -9,3 +9,11 @@ Idea:
 4) the distance from the landmark to the curve is to be constrained using the curve parameter
 5) how: new factors with symforce
 
+Currently doesnt work - assosication between landmarks and splines over constrains poses
+* black: gt poses
+* green: dead reckoning
+* orange: regular SLAM
+* blue: tunnel SLAM
+
+![Alt text](/docs/image.png?raw=true "image")
+
