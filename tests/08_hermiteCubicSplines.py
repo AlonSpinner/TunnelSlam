@@ -68,7 +68,7 @@ p1_a = x2_a.t
 m1_a = x2_a.R.to_rotation_matrix()[:,0]
 
 splinePoint_a = (2*s**3-3*s**2+1) * p0_a \
-        + (s**3 - 2*s**2 + s) * m0_a * 10\
+        + (s**3 - 2*s**2 + s) * m0_a * 50\
         + (-2*s**3 + 3*s**2) * p1_a \
         + (s**3 - s**2) * m1_a* 10
 

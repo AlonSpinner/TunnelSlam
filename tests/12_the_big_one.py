@@ -274,7 +274,7 @@ optVals_tunnelslam = result.optimized_values
 
 fig = plt.figure()
 ax = plt.axes(projection='3d', aspect='equal',
-        xlim = (-10,10), ylim = (-15,5), zlim = (0,40),
+        xlim = (-20,20), ylim = (-30,5), zlim = (0,40),
         xlabel = 'x', ylabel = 'y', zlabel = 'z')
 plotting.axis_equal(ax)
 #plot trajectory
